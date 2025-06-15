@@ -3,6 +3,7 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import heapq
 # Configuracion de librerias
 #Mostramos 3 decimales, no usamos notacion cientifica y mostramos los numeros flotantes enteros(esto es para que cuando sean 0 se vean igual)
 np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
@@ -130,7 +131,7 @@ crear_grafico_valores(melbourne_dataset, 'Melbourne')
 #Quito tiene la temperatura media más estable (desvío estándar más bajo: ~1.3 °C), lo cual es típico de una ciudad ecuatorial con clima templado todo el año.
 #Oslo muestra la mayor variabilidad térmica (desvío estándar de ~8.79 °C) por lo que tiene un clima más cambiante.
 #Melbourne tiene la media más alta (~17.8 °C), pero también muestra una variabilidad moderada (desvío estándar de ~4.25 °C), lo que sugiere un clima templado oceánico con cambios frecuentes.
-
+"""
 #Funcion que calcula el factor de correlacion cruzado entre dos datasets 
 def calcular_correlacion_cruzada(dataset1, dataset2,nombre_ciudad1, nombre_ciudad2):
     if len(dataset1) != len(dataset2):
@@ -151,7 +152,7 @@ def calcular_correlacion_cruzada(dataset1, dataset2,nombre_ciudad1, nombre_ciuda
 print("\nCorrelación cruzada entre Oslo y Quito:", calcular_correlacion_cruzada(oslo_dataset, quito_dataset, 'Oslo', 'Quito'))
 print("Correlación cruzada entre Oslo y Melbourne:", calcular_correlacion_cruzada(oslo_dataset, melbourne_dataset, 'Oslo', 'Melbourne'))
 print("Correlación cruzada entre Quito y Melbourne:", calcular_correlacion_cruzada(quito_dataset, melbourne_dataset, 'Quito', 'Melbourne'))
-#SEGUIR DESPUES
+"""
 ##QUE HACEMOS CON LOS DATASETS Q SOPN DE TAMANIO DIFERENTE?
 #-----------------------------------------------------------------------PARTE 2--------------------------------------------------------------------
 
@@ -233,6 +234,8 @@ print("Matriz de transición de Oslo:\n", matriz_transicion_oslo)
 print("Matriz de transición de Quito:\n", matriz_transicion_quito)
 print("Matriz de transición de Melbourne:\n", matriz_transicion_melbourne)
 
+#----------------------------------------------------CALCULO DEL VECTOR ESTACIONARIO----------------------------------------------------
+
 #A partir de esta matriz de transicion, calcularemos el vector estacionario con motor de monte carlo
 # Definimos una funcion que calcula la matriz acumulada de cada fuente
 def calcular_matriz_acumulada(matriz_transicion):
@@ -269,16 +272,15 @@ def generar_proximo_estado(matriz_acumulada, simbolo_anterior):
     raise ValueError("No se pudo generar el próximo estado, matriz acumulada no válida.")
 
 
-def calcular_vector_estacionario(matriz_acumulada, e=0.00001, min_iter=5000):
+def calcular_vector_estacionario(matriz_acumulada, e=0.0001, min_iter=5000):
     # Inicializar el vector estacionario
-    vector_estacionario = np.array([1/3, 1/3, 1/3])  # Distribución uniforme inicial
     emisiones = np.array([0, 0, 0])  # Contador de emisiones para cada estado
     Vt_actual = np.array([0, 0, 0])  # Vector de emisiones actual
     Vt_anterior = np.array([0, 0, 0])  # Vector de emisiones anterior
     cantidad_simbolos = 0  # Contador de símbolos generados
     simbolo_actual = 0  # Estado actual, no importa su valor inicial al calcular el vector estacionario
 
-    while not converge_vector(vector_estacionario, Vt_anterior, e) or cantidad_simbolos < min_iter:
+    while not converge_vector(Vt_actual, Vt_anterior, e) or cantidad_simbolos < min_iter:
         # Generamos el proximo simbolo
         simbolo_actual = generar_proximo_estado(matriz_acumulada, simbolo_actual)
         emisiones[simbolo_actual] += 1
@@ -304,12 +306,14 @@ print("Comprobacion Vector estacionario de Oslo:\n", round(sum(vector_estacionar
 print("Comprobacion Vector estacionario de Quito:\n", round(sum(vector_estacionario_quito), 3))
 print("Comprobacion Vector estacionario de Melbourne:\n", round(sum(vector_estacionario_melbourne), 3))
 
+
+#--------------------------------------------------------------CALCULO DEL TIEMPO MEDIO DE PRIMERA RECURRENCIA----------------------------------------------------
 #Definimos las funciones auxilineares necesarias
 def converge(media_actual, media_anterior, e=0.00001):
     return abs(media_actual - media_anterior) < e
 
 # Funcion para calcular el tiempo medio de primera recurrencia
-def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.00001, min_iter=5000):
+def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.001, min_iter=5000):
     retornos = 0
     media_actual = 0
     media_anterior = 0
@@ -378,3 +382,148 @@ entropias = pd.DataFrame({
 print("Entropías de orden 0 y 1:\n", entropias)
 
 #Implementamos una funcion que nos de codigo de Huffman
+#pri
+
+class NodoHuffmann:
+    def __init__(self, probabilidad, simbolo=None, izq=None, der=None):
+        self.simbolo = simbolo
+        self.probabilidad = probabilidad
+        self.izq = izq
+        self.der = der
+
+    def __lt__(self, otro): #Creamos esto para comparar nodos mas facil y que se pueda utilizar en la cola de prioridad
+        return self.probabilidad < otro.probabilidad
+    
+
+def calcular_huffman(probabilidades):
+    n = len(probabilidades)
+    
+    #Creamos el minheap para almacenar los nodos y acceder de manera eficiente a los menor probabilidad
+    codequeue = []
+    for simbolo, probabilidad in probabilidades.items():
+        if probabilidad == 0:
+            continue
+        nodo = NodoHuffmann(probabilidad, simbolo)
+        heapq.heappush(codequeue, nodo)
+    while len(codequeue) > 1:
+        #Sacamos los 2 nodos con menor probabilidad
+        menor_probabilidad = heapq.heappop(codequeue) 
+        segundo_menor_probabilidad = heapq.heappop(codequeue)
+        #los combinamos en un nuevo nodo padre
+        nodo_padre = NodoHuffmann(
+            probabilidad=menor_probabilidad.probabilidad + segundo_menor_probabilidad.probabilidad,
+            izq=menor_probabilidad,
+            der=segundo_menor_probabilidad
+        )
+        heapq.heappush(codequeue, nodo_padre)
+        
+    # El ultimo nodo de la cola es la raíz del árbol de Huffman
+    raiz = codequeue[0]
+    # Generamos los códigos de Huffman
+    codigos = {}
+    def generar_codigos_huffman(nodo, codigo=''):
+        if nodo.simbolo is not None:
+            codigos[nodo.simbolo] = codigo
+        else:
+            generar_codigos_huffman(nodo.izq, codigo + '0')
+            generar_codigos_huffman(nodo.der, codigo + '1')
+    
+    
+    generar_codigos_huffman(raiz)
+    #Pasamos el diccionario a un DataFrame
+    codigos = pd.DataFrame(list(codigos.items()), columns=['Simbolo', 'Codigo'])
+    return codigos
+
+#llamamos a la funcion de codificacion de Huffman para cada dataset
+codigos_huffman_oslo = calcular_huffman({
+    'F': vector_estacionario_oslo[0],
+    'T': vector_estacionario_oslo[1],
+    'C': vector_estacionario_oslo[2]
+})
+print("Códigos de Huffman para Oslo:", codigos_huffman_oslo)
+
+#Calculamos para quito
+codigos_huffman_quito = calcular_huffman({
+    'F': vector_estacionario_quito[0],
+    'T': vector_estacionario_quito[1],
+    'C': vector_estacionario_quito[2]
+})
+print("Códigos de Huffman para Quito:", codigos_huffman_quito)
+
+#Calculamos para melbourne
+codigos_huffman_melbourne = calcular_huffman({
+    'F': vector_estacionario_melbourne[0],
+    'T': vector_estacionario_melbourne[1],
+    'C': vector_estacionario_melbourne[2]
+})
+print("Códigos de Huffman para Melbourne:", codigos_huffman_melbourne)
+
+#Extendemos las fuentes a orden 2
+def extender_fuente_orden_2(matriz_transicion, vector_estacionario):
+    estados = ['F', 'T', 'C']
+    fuente_orden_2 = {}
+    
+    for i in range(3):
+        for j in range(3):
+            estado = estados[i] + estados[j]
+            probabilidad = matriz_transicion[i, j] * vector_estacionario[i]
+            fuente_orden_2[estado] = probabilidad
+    # Guardamos en un DF para mayor legibilidad
+    fuente_orden_2 = pd.DataFrame(list(fuente_orden_2.items()), columns=['Estado', 'Probabilidad'])
+    return fuente_orden_2
+
+# Extendemos las fuentes a orden 2 para cada dataset
+fuente_orden_2_oslo = extender_fuente_orden_2(matriz_transicion_oslo, vector_estacionario_oslo)
+fuente_orden_2_quito = extender_fuente_orden_2(matriz_transicion_quito, vector_estacionario_quito)
+fuente_orden_2_melbourne = extender_fuente_orden_2(matriz_transicion_melbourne, vector_estacionario_melbourne)
+
+print("Fuente de orden 2 para Oslo:\n", fuente_orden_2_oslo)
+print("Fuente de orden 2 para Quito:\n", fuente_orden_2_quito)
+print("Fuente de orden 2 para Melboure\n:", fuente_orden_2_melbourne)
+
+#calculamos los codigos de Huffman para las fuentes de orden 2
+#primero pasamos las probabilidades de la fuente de orden 2 a un diccionario
+def calcular_huffman_orden_2(fuente_orden_2):
+    probabilidades = {row['Estado']: row['Probabilidad'] for _, row in fuente_orden_2.iterrows()}
+    return calcular_huffman(probabilidades)
+
+codigos_huffman_orden_2_oslo = calcular_huffman_orden_2(fuente_orden_2_oslo)
+print("Códigos de Huffman de orden 2 para Oslo:", codigos_huffman_orden_2_oslo)
+
+codigos_huffman_orden_2_quito = calcular_huffman_orden_2(fuente_orden_2_quito)
+print("Códigos de Huffman de orden 2 para Quito:", codigos_huffman_orden_2_quito)
+
+codigos_huffman_orden_2_melbourne = calcular_huffman_orden_2(fuente_orden_2_melbourne)
+print("Códigos de Huffman de orden 2 para Melbourne:", codigos_huffman_orden_2_melbourne)
+
+#Calculamos el limite inferior y superior de la longitud de los codigos de Huffman segun el teorema de Shannon
+def calcular_limite_huffman(H1,Hcond=0,n=1):
+    # H1 es la entropia de orden 1, Hcond es la entropia condicional y n es la extension de la fuente
+    # Calculamos el limite inferior y superior de la longitud de los codigos de Huffman
+    limite_inferior = H1/n + (1-1/n) * Hcond
+    limite_superior = limite_inferior + 1/n
+    return limite_inferior, limite_superior
+
+def calcular_longitud_media(codigos_huffman, fuente):
+    longitud_total = 0
+    for _, row in codigos_huffman.iterrows():
+        simbolo = row['Simbolo']
+        
+        if not (fuente['Estado'] == simbolo).any():
+            print(f"Simbolo '{simbolo}' no encontrado en fuente")
+
+        codigo = row['Codigo']
+        probabilidad = fuente[fuente['Estado'] == simbolo]['Probabilidad'].values[0] #Values pq devuelve una serie pandas
+        longitud_total += len(codigo) * probabilidad
+
+    return longitud_total
+
+print("limite inferior y superior de la longitud de los codigos de Huffman para Oslo:")
+limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H1_oslo, H0_oslo, 2)
+print(f"Limite inferior: {limite_inferior_oslo:.3f}, Limite superior: {limite_superior_oslo:.3f}")
+
+
+longitud_media_oslo = calcular_longitud_media(codigos_huffman_oslo, fuente_orden_2_oslo)
+print(f"Longitud media de los codigos de Huffman para Oslo: {longitud_media_oslo:.3f}")
+#Comparamos los limites de longitud de los codigos de Huffman con la longitud media de los codigos
+
