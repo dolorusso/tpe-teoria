@@ -215,7 +215,7 @@ def calcular_matriz_transicion(matriz_conjunta):
     #Obtenemos la probilidad de cada columna
     prob_marginal_x = [0] * 3
     for i in range(3):
-        prob_marginal_x[i] = matriz_conjunta[i,0] + matriz_conjunta[i,1] + matriz_conjunta[i,2]#harcodeado, importa?
+        prob_marginal_x[i] = matriz_conjunta[i,0] + matriz_conjunta[i,1] + matriz_conjunta[i,2]
 
     # Inicializar matriz de transición
     matriz_transicion = np.zeros((3, 3))
@@ -275,7 +275,7 @@ def generar_proximo_estado(matriz_acumulada, simbolo_anterior):
     raise ValueError("No se pudo generar el próximo estado, matriz acumulada no válida.")
 
 
-def calcular_vector_estacionario(matriz_acumulada, e=0.0001, min_iter=5000):
+def calcular_vector_estacionario(matriz_acumulada, e=0.0000001, min_iter=5000):
     # Inicializar el vector estacionario
     emisiones = np.array([0, 0, 0])  # Contador de emisiones para cada estado
     Vt_actual = np.array([0, 0, 0])  # Vector de emisiones actual
@@ -375,8 +375,8 @@ def calcular_entropia_condicional(matriz_transicion, vector_estacionario):
     for i in range(3):
         h_i = 0
         for j in range(3):
-            if matriz_transicion[i, j] > 0:
-                h_i -= matriz_transicion[i, j] * np.log2(matriz_transicion[i, j])
+            if matriz_transicion[j, i] > 0: #j,i la entrada esta en las columnas
+                h_i -= matriz_transicion[j, i] * np.log2(matriz_transicion[j, i])
         entropia_condicional += vector_estacionario[i] * h_i
     return entropia_condicional
 
@@ -479,7 +479,7 @@ def extender_fuente_orden_2(matriz_transicion, vector_estacionario):
     for i in range(3):
         for j in range(3):
             estado = estados[i] + estados[j]
-            probabilidad = matriz_transicion[i, j] * vector_estacionario[i]
+            probabilidad = matriz_transicion[j, i] * vector_estacionario[i]
             fuente_orden_2[estado] = probabilidad
     # Guardamos en un DF para mayor legibilidad
     fuente_orden_2 = pd.DataFrame(list(fuente_orden_2.items()), columns=['Estado', 'Probabilidad'])
@@ -626,7 +626,7 @@ melbourne_ruidoso_dataset['clima_salida'] = melbourne_ruidoso_dataset['AvgTemper
 print("\nDatos de entrada y salida de Melbourne ruidoso:\n", melbourne_ruidoso_dataset)
 
 # Definimos la funcion que calcule la matriz de transicion del canal, teniendo en cuenta la entrada clima y la salida clima
-def calcular_matriz_transicion_canal(dataset):
+def calcular_matriz_conjunta_canal(dataset):
     estados = ['F', 'T', 'C']
     suma_entradas = {'F': 0, 'T': 0, 'C': 0}  # Suma de las entradas para cada estado
     matriz_transicion = pd.DataFrame(0, index=estados, columns=estados, dtype=float)
@@ -635,24 +635,24 @@ def calcular_matriz_transicion_canal(dataset):
         salida = dataset['clima_salida'].iloc[i]
         matriz_transicion.loc[entrada,salida] += 1
         suma_entradas[entrada] += 1
-
-    # Dividimos por cada suma
-    for entrada in estados:
-        total = suma_entradas[entrada]
-        if total > 0:
-            matriz_transicion.loc[entrada] /= total
-    return matriz_transicion.T #Traspuesta pq la calcule al reves con entrada,salida
+    # Frecuencias a probabilidades
+    matriz_transicion/=dataset['clima_entrada'].size
+    return matriz_transicion
 
 #Calculamos la matriz de transicion del canal T4
-matriz_transicion_t4 = calcular_matriz_transicion_canal(melbourne_ruidoso_dataset)
+matriz_conjunta_t4 = calcular_matriz_conjunta_canal(melbourne_ruidoso_dataset)
+print("\nMatriz conjunta del canal T4:\n", matriz_conjunta_t4)
 
+# Calculamos la matriz de transicion del canal T4
+matriz_transicion_t4 = calcular_matriz_transicion(matriz_conjunta_t4)
+print("\nMatriz de transición del canal T4:\n", matriz_transicion_t4)
 #Calculamos el ruido del canal
 def calcular_ruido_canal(matriz_transicion,vector_estacionario): # El estacionario es F T C
     rx = [0, 0, 0]  # Inicializamos el vector de ruido para cada estado
     for i in range(3):
         for j in range(3):
-            if matriz_transicion.iloc[i, j] > 0:
-                rx[i] -= matriz_transicion.iloc[i, j] * np.log2(matriz_transicion.iloc[i, j])
+            if matriz_transicion.iloc[j, i] > 0:
+                rx[i] -= matriz_transicion.iloc[j, i] * np.log2(matriz_transicion.iloc[j, i])
     ruido = rx[0] * vector_estacionario[0] + rx[1] * vector_estacionario[1] + rx[2] * vector_estacionario[2]
     return ruido #VER QUE EL ESTACIONARIO ESTE EN ESTE ORDEN!!!!
 
@@ -661,7 +661,17 @@ print("\nRuido del canal T4:", ruido_canal)
 
 # Calculamos la informacion mutua del canal
 def calcular_informacion_mutua(matriz_transicion, vector_estacionario):
+    #Primero, calculamos la distribucion de la salida
+    dist_y = np.zeros(3)
+    for i in range(3):
+        for j in range(3):
+            dist_y[j] += matriz_transicion.iloc[j, i] * vector_estacionario[i]
+    #Despues calculamos la informacion mutua con el dato obtenido
     informacion_mutua = 0
-    #Calculamos la entropia de la salida del canal
-    
+    for i in range(3):
+        if dist_y[i] > 0:
+            informacion_mutua += dist_y[i] * np.log2(dist_y[i])
     return informacion_mutua
+
+informacion_mutua_canal = calcular_informacion_mutua(matriz_transicion_t4, vector_estacionario_melbourne)
+print("Información mutua del canal T4:", informacion_mutua_canal)
