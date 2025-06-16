@@ -647,7 +647,7 @@ def calcular_matriz_transicion_canal(dataset):
 matriz_transicion_t4 = calcular_matriz_transicion_canal(melbourne_ruidoso_dataset)
 
 #Calculamos el ruido del canal
-def calcular_ruido_canal(matriz_transicion,vector_estacionario):
+def calcular_ruido_canal(matriz_transicion,vector_estacionario): # El estacionario es F T C
     rx = [0, 0, 0]  # Inicializamos el vector de ruido para cada estado
     for i in range(3):
         for j in range(3):
