@@ -1,5 +1,5 @@
 # Importamos la librería pandas y seaborn
-import seaborn as sns
+#import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,9 +10,9 @@ np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
 
 
 # Abrimos el archivo usando una función específica de pandas
-oslo_dataset = pd.read_csv("datos/temperature_Oslo_celsius.csv")
-quito_dataset = pd.read_csv("datos/temperature_Quito_celsius.csv")
-melbourne_dataset = pd.read_csv("datos/temperature_Melbourne_celsius.csv")
+oslo_dataset = pd.read_csv("temperature_Oslo_celsius.csv")
+quito_dataset = pd.read_csv("temperature_Quito_celsius.csv")
+melbourne_dataset = pd.read_csv("temperature_Melbourne_celsius.csv")
 
 
 
@@ -357,32 +357,42 @@ def calcular_entropia_orden_0(vector_estacionario):
             entropia -= vector_estacionario[i] * np.log2(vector_estacionario[i])
     return entropia
 
-# Definimos una funcion para calcular la entropia de orden 1 de cada dataset
-def calcular_entropia_orden_1(matriz_conjunta):
+"""# Definimos una funcion para calcular la entropia condicional
+def calcular_entropia_condicional(matriz_conjunta):
     # La entropia de orden 1 se calcula como -sum(p(x,y) * log(p(x,y))) para cada par de estados
     entropia = 0
     for i in range(3):
         for j in range(3):
             if matriz_conjunta[i, j] > 0:
                 entropia -= matriz_conjunta[i, j] * np.log2(matriz_conjunta[i, j])
-    return entropia
+    return entropia"""
+    
+def calcular_entropia_condicional(matriz_transicion, vector_estacionario):
+    entropia_condicional = 0
+    for i in range(3):
+        h_i = 0
+        for j in range(3):
+            if matriz_transicion[i, j] > 0:
+                h_i -= matriz_transicion[i, j] * np.log2(matriz_transicion[i, j])
+        entropia_condicional += vector_estacionario[i] * h_i
+    return entropia_condicional
 
 # Calculamos la entropia de orden 0 y 1 para cada dataset
 H0_oslo = calcular_entropia_orden_0(vector_estacionario_oslo)
 H0_quito = calcular_entropia_orden_0(vector_estacionario_quito)
 H0_melbourne = calcular_entropia_orden_0(vector_estacionario_melbourne)
-H1_oslo = calcular_entropia_orden_1(matriz_conjunta_oslo)
-H1_quito = calcular_entropia_orden_1(matriz_conjunta_quito)
-H1_melbourne = calcular_entropia_orden_1(matriz_conjunta_melbourne)
+
+Hcond_oslo = calcular_entropia_condicional(matriz_transicion_oslo, vector_estacionario_oslo)
+Hcond_quito = calcular_entropia_condicional(matriz_transicion_quito, vector_estacionario_quito)
+Hcond_melbourne = calcular_entropia_condicional(matriz_transicion_melbourne, vector_estacionario_melbourne)
 # Imprimimos las entropias de orden 0 y 1 en un dataframe conjunto
 entropias = pd.DataFrame({
     'H0': [H0_oslo, H0_quito, H0_melbourne],
-    'H1': [H1_oslo, H1_quito, H1_melbourne]
+    'Hcond': [Hcond_oslo, Hcond_quito, Hcond_melbourne]
 }, index=['Oslo', 'Quito', 'Melbourne'])
-print("Entropías de orden 0 y 1:\n", entropias)
+print("Entropías H1 y Hcond:\n", entropias)
 
 #Implementamos una funcion que nos de codigo de Huffman
-#pri
 
 class NodoHuffmann:
     def __init__(self, probabilidad, simbolo=None, izq=None, der=None):
@@ -488,13 +498,13 @@ def calcular_huffman_orden_2(fuente_orden_2):
     return calcular_huffman(probabilidades)
 
 codigos_huffman_orden_2_oslo = calcular_huffman_orden_2(fuente_orden_2_oslo)
-print("Códigos de Huffman de orden 2 para Oslo:", codigos_huffman_orden_2_oslo)
+print("Códigos de Huffman de orden 2 para Oslo:\n", codigos_huffman_orden_2_oslo)
 
 codigos_huffman_orden_2_quito = calcular_huffman_orden_2(fuente_orden_2_quito)
-print("Códigos de Huffman de orden 2 para Quito:", codigos_huffman_orden_2_quito)
+print("\nCódigos de Huffman de orden 2 para Quito:\n", codigos_huffman_orden_2_quito)
 
 codigos_huffman_orden_2_melbourne = calcular_huffman_orden_2(fuente_orden_2_melbourne)
-print("Códigos de Huffman de orden 2 para Melbourne:", codigos_huffman_orden_2_melbourne)
+print("\nCódigos de Huffman de orden 2 para Melbourne:\n", codigos_huffman_orden_2_melbourne)
 
 #Calculamos el limite inferior y superior de la longitud de los codigos de Huffman segun el teorema de Shannon
 def calcular_limite_huffman(H1,Hcond=0,n=1):
@@ -508,22 +518,98 @@ def calcular_longitud_media(codigos_huffman, fuente):
     longitud_total = 0
     for _, row in codigos_huffman.iterrows():
         simbolo = row['Simbolo']
-        
-        if not (fuente['Estado'] == simbolo).any():
-            print(f"Simbolo '{simbolo}' no encontrado en fuente")
-
         codigo = row['Codigo']
         probabilidad = fuente[fuente['Estado'] == simbolo]['Probabilidad'].values[0] #Values pq devuelve una serie pandas
         longitud_total += len(codigo) * probabilidad
 
     return longitud_total
 
+#Comparamos los limites de longitud de los codigos de Huffman con la longitud media por simbolo de los codigos
+#Oslo
 print("limite inferior y superior de la longitud de los codigos de Huffman para Oslo:")
-limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H1_oslo, H0_oslo, 2)
+limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H0_oslo, Hcond_oslo, 2)
 print(f"Limite inferior: {limite_inferior_oslo:.3f}, Limite superior: {limite_superior_oslo:.3f}")
+longitud_media_oslo = calcular_longitud_media(codigos_huffman_orden_2_oslo, fuente_orden_2_oslo)
+print(f"Longitud media por simbolo de los codigos de Huffman para Oslo: {longitud_media_oslo/2:.3f}")
 
+#Quito
+print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Quito:")
+limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H0_quito, Hcond_quito, 2)
+print(f"Limite inferior: {limite_inferior_quito:.3f}, Limite superior: {limite_superior_quito:.3f}")
+longitud_media_quito = calcular_longitud_media(codigos_huffman_orden_2_quito, fuente_orden_2_quito)
+print(f"Longitud media por simbolo de los codigos de Huffman para Quito: {longitud_media_quito/2:.3f}")
 
-longitud_media_oslo = calcular_longitud_media(codigos_huffman_oslo, fuente_orden_2_oslo)
-print(f"Longitud media de los codigos de Huffman para Oslo: {longitud_media_oslo:.3f}")
-#Comparamos los limites de longitud de los codigos de Huffman con la longitud media de los codigos
+#Melbourne
+print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Melbourne:")
+limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H0_melbourne, Hcond_melbourne, 2)
+print(f"Limite inferior: {limite_inferior_melbourne:.3f}, Limite superior: {limite_superior_melbourne:.3f}")
+longitud_media_melbourne = calcular_longitud_media(codigos_huffman_orden_2_melbourne, fuente_orden_2_melbourne)
+print(f"Longitud media por simbolo de los codigos de Huffman para Melbourne: {longitud_media_melbourne/2:.3f}")
+
+# Definimos la funcion que codifique las temperaturas de cada ciudad, dada una lista de simbolos, devuelve un string con el codigo total
+def codificar_temperaturas(simbolos_sin_comprimir, codigos_huffman):
+    codificacion = ''
+    for simbolo in simbolos_sin_comprimir:
+        codigo = codigos_huffman[codigos_huffman['Simbolo'] == simbolo]['Codigo'].values[0]
+        codificacion += codigo
+    return codificacion
+
+def codificar_temperaturas_orden_2(simbolos_sin_comprimir, codigos_huffman):
+    #Creamos una lista con los pares de simbolos no superpuestos
+    dataset_pares = []
+    for i in range(0,len(simbolos_sin_comprimir) - 1,2):
+        # Nos aseguramos de que no haya un simbolo sobrante al final
+        if i + 1 >= len(simbolos_sin_comprimir):
+            break
+        par = simbolos_sin_comprimir[i] + simbolos_sin_comprimir[i + 1]
+        dataset_pares.append(par)
+    
+    # Codificamos las temperaturas usando la funcion ya definida
+    codificacion = codificar_temperaturas(dataset_pares, codigos_huffman)
+    return codificacion
+
+#-------------------------------- ORDEN 1 --------------------------------#
+
+# Codificamos las temperaturas de cada ciudad
+codificacion_oslo = codificar_temperaturas(oslo_dataset['clima'].tolist(), codigos_huffman_oslo)
+codificacion_quito = codificar_temperaturas(quito_dataset['clima'].tolist(), codigos_huffman_quito)
+codificacion_melbourne = codificar_temperaturas(melbourne_dataset['clima'].tolist(), codigos_huffman_melbourne)
+
+# Imprimimos las longitudes de cada codificaciones y las comparamos con el espacio que ocupara sin compresion
+print("\nLongitud de la codificación de Oslo:", len(codificacion_oslo), "bits")
+# Comparamos con la longitud de la codificación sin compresión, suponiendo que cada simbolo ocupa 1 byte (tamano de char)
+print("La longitud de la codificación sin compresión sería:", len(oslo_dataset) * 8, "bits")
+print("Por lo tanto, la compresión es de:", (len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100, "%")
+# Repetimos para las otras 2
+print("\nLongitud de la codificación de Quito:", len(codificacion_quito), "bits")
+print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")
+print("Por lo tanto, la compresión es de:", (len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100, "%")
+print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne), "bits")
+print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")  
+print("Por lo tanto, la compresión es de:", (len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100, "%")
+
+#-------------------------------- ORDEN 2 --------------------------------#
+# Codificamos las temperaturas de cada ciudad
+codificacion_oslo = codificar_temperaturas_orden_2(oslo_dataset['clima'].tolist(), codigos_huffman_orden_2_oslo)
+codificacion_quito = codificar_temperaturas_orden_2(quito_dataset['clima'].tolist(), codigos_huffman_orden_2_quito)
+codificacion_melbourne = codificar_temperaturas_orden_2(melbourne_dataset['clima'].tolist(), codigos_huffman_orden_2_melbourne)
+
+#Oslo
+# Imprimimos las longitudes de cada codificaciones y las comparamos con el espacio que ocupara sin compresion
+print("\nLongitud de la codificación de Oslo:", len(codificacion_oslo), "bits")
+# Comparamos con la longitud de la codificación sin compresión
+print("La longitud de la codificación sin compresión sería:", len(oslo_dataset) * 8, "bits")  # 1B por simbolo, pq no estan juntos en el dataset
+print("Por lo tanto, la compresión es de:", (len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100, "%")
+
+#Repetimos para las otras 2
+
+#Quito
+print("\nLongitud de la codificación de Quito:", len(codificacion_quito), "bits")
+print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")  
+print("Por lo tanto, la compresión es de:", (len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100, "%")
+
+#Melbourne
+print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne), "bits")
+print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")
+print("Por lo tanto, la compresión es de:", (len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100, "%")
 
