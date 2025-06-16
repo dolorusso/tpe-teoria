@@ -13,7 +13,7 @@ np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
 oslo_dataset = pd.read_csv("temperature_Oslo_celsius.csv")
 quito_dataset = pd.read_csv("temperature_Quito_celsius.csv")
 melbourne_dataset = pd.read_csv("temperature_Melbourne_celsius.csv")
-
+melbourne_ruidoso_dataset = pd.read_csv('temperature_Melbourne_celsius_ruidoso.csv')
 
 
 #---------------------------------------------Limpieza de datos---------------------------------------------------
@@ -45,9 +45,12 @@ atipicos_quito, q1_quito, q3_quito, iqr_quito = analizar_rango_intercuartil(quit
 print("\nDatos de Melbourne:")
 # Repetimos el proceso para Melbourne
 atipicos_melbourne, q1_melbourne, q3_melbourne, iqr_melbourne = analizar_rango_intercuartil(melbourne_dataset)
-# Igual que en Oslo, existen valores muy fuera del rango con valor -73, procedemos a eliminarlos
-melbourne_dataset = melbourne_dataset[(melbourne_dataset['AvgTemperature'] > -40)]
 
+# Igual que en Oslo, existen valores muy fuera del rango con valor -73, procedemos a eliminarlos
+#Antes guardamos el indice de los valores atípicos para poder eliminarlos en segundo dataset de melbourne
+indices_atipicos_melbourne = atipicos_melbourne.index
+melbourne_dataset = melbourne_dataset[(melbourne_dataset['AvgTemperature'] > -40)]
+melbourne_ruidoso_dataset = melbourne_ruidoso_dataset.drop(indices_atipicos_melbourne, axis=0)
 
 #-----------------------------------------------------------------------PARTE 1--------------------------------------------------------------------
 
@@ -613,3 +616,52 @@ print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne
 print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")
 print("Por lo tanto, la compresión es de:", (len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100, "%")
 
+#---------------------------------------------------- Parte 4 ------------------------------------------------------------------------------#
+
+#Adjuntamos el clima de entrada en la tabla, para manejarlo mas facil
+melbourne_ruidoso_dataset['clima_entrada'] = melbourne_dataset['clima']
+
+# Generamos los simbolos de las temperaturas de cada ciudad (F, T, C)
+melbourne_ruidoso_dataset['clima_salida'] = melbourne_ruidoso_dataset['AvgTemperature'].apply(funcion_disc)
+print("\nDatos de entrada y salida de Melbourne ruidoso:\n", melbourne_ruidoso_dataset)
+
+# Definimos la funcion que calcule la matriz de transicion del canal, teniendo en cuenta la entrada clima y la salida clima
+def calcular_matriz_transicion_canal(dataset):
+    estados = ['F', 'T', 'C']
+    suma_entradas = {'F': 0, 'T': 0, 'C': 0}  # Suma de las entradas para cada estado
+    matriz_transicion = pd.DataFrame(0, index=estados, columns=estados, dtype=float)
+    for i in range(len(dataset)):
+        entrada = dataset['clima_entrada'].iloc[i]
+        salida = dataset['clima_salida'].iloc[i]
+        matriz_transicion.loc[entrada,salida] += 1
+        suma_entradas[entrada] += 1
+
+    # Dividimos por cada suma
+    for entrada in estados:
+        total = suma_entradas[entrada]
+        if total > 0:
+            matriz_transicion.loc[entrada] /= total
+    return matriz_transicion.T #Traspuesta pq la calcule al reves con entrada,salida
+
+#Calculamos la matriz de transicion del canal T4
+matriz_transicion_t4 = calcular_matriz_transicion_canal(melbourne_ruidoso_dataset)
+
+#Calculamos el ruido del canal
+def calcular_ruido_canal(matriz_transicion,vector_estacionario):
+    rx = [0, 0, 0]  # Inicializamos el vector de ruido para cada estado
+    for i in range(3):
+        for j in range(3):
+            if matriz_transicion.iloc[i, j] > 0:
+                rx[i] -= matriz_transicion.iloc[i, j] * np.log2(matriz_transicion.iloc[i, j])
+    ruido = rx[0] * vector_estacionario[0] + rx[1] * vector_estacionario[1] + rx[2] * vector_estacionario[2]
+    return ruido #VER QUE EL ESTACIONARIO ESTE EN ESTE ORDEN!!!!
+
+ruido_canal = calcular_ruido_canal(matriz_transicion_t4, vector_estacionario_melbourne)
+print("\nRuido del canal T4:", ruido_canal)
+
+# Calculamos la informacion mutua del canal
+def calcular_informacion_mutua(matriz_transicion, vector_estacionario):
+    informacion_mutua = 0
+    #Calculamos la entropia de la salida del canal
+    
+    return informacion_mutua
