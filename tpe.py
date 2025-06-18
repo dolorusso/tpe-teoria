@@ -118,27 +118,12 @@ def crear_histograma(dataset, ciudad,rangox):
 
 # Creamos los histogramas para cada ciudad
 
-""" ------------------------ DESCOMENTAR DESPUES ------------------------
+
 crear_histograma(oslo_dataset, 'Oslo',range(-25,25,5))
 crear_histograma(quito_dataset, 'Quito',range(10,20,1))
 crear_histograma(melbourne_dataset, 'Melbourne',range(5,30,5))
-"""
 
-""" VER QUE HACEMOS CON ESTOS GRAFICOS
-#Grafico que muestra cada valor con su indice en el dataset
-def crear_grafico_valores(dataset, ciudad):
-    plt.figure(figsize=(15, 5))
-    plt.plot(dataset['AvgTemperature'], marker='o', linestyle='-', label=ciudad)
-    plt.title(f'Temperaturas en {ciudad} a lo largo del tiempo')
-    plt.xlabel('Dia')
-    plt.ylabel('Temperatura (°C)')
-    plt.axhline(media_desvio_df.loc[ciudad]['Media'], color='red', linestyle='dashed', linewidth=1, label='Media')
-    plt.legend()
-    plt.show()
 
-crear_grafico_valores(oslo_dataset, 'Oslo')
-crear_grafico_valores(quito_dataset, 'Quito')
-crear_grafico_valores(melbourne_dataset, 'Melbourne')"""
 
 
 #Quito tiene la temperatura media más estable (desvío estándar más bajo: ~1.3 °C), lo cual es típico de una ciudad ecuatorial con clima templado todo el año.
@@ -306,7 +291,7 @@ def converge(media_actual, media_anterior, e=0.00001):
     return abs(media_actual - media_anterior) < e
 
 # Funcion para calcular el tiempo medio de primera recurrencia
-def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.000001, min_iter=5000):
+def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.0001, min_iter=5000):
     retornos = 0
     media_actual = 0
     media_anterior = 0
@@ -341,13 +326,35 @@ tiempos_recurrencia = pd.concat([tiempos_recurrencia_oslo, tiempos_recurrencia_q
 print("Tiempos de recurrencia:\n", tiempos_recurrencia)
 
 # --------------------------------- PARTE 3 ----------------------------------------------------#
+def calcular_vector_estacionario_teorico(matriz_transicion):
+    
+    matriz_entrada = matriz_transicion.values
+    A = matriz_entrada - np.eye(matriz_entrada.shape[0])  # Restamos la matriz identidad
+    A[-1, :] = 1  # Reemplazamos la última fila por unos
+    b = np.zeros(matriz_entrada.shape[0])  # Vector de 0 (excepto el último elemento)\
+    b[-1] = 1  # El último elemento del vector b es 1
+    A = np.linalg.inv(A)  
+    A = A * b.T
+    print("Matriz A:\n", A)
+
+    # Pasamos a DataFrame para seguir la misma estructura que antes
+    vector_estacionario = pd.Series(A[:, -1], index=['F', 'T', 'C'])
+    return vector_estacionario
+
+vector_estacionario_oslo = calcular_vector_estacionario_teorico(matriz_transicion_oslo)
+vector_estacionario_quito = calcular_vector_estacionario_teorico(matriz_transicion_quito)
+vector_estacionario_melbourne = calcular_vector_estacionario_teorico(matriz_transicion_melbourne)
+print("\n\n\n")
+print("Vector estacionario teorico de Oslo:\n", vector_estacionario_oslo)
+print("Vector estacionario teorico de Quito:\n", vector_estacionario_quito)
+print("Vector estacionario teorico de Melbourne:\n", vector_estacionario_melbourne)
 # Definimos una funcion para calcular la entropia de orden 0 de cada dataset
 def calcular_entropia_orden_0(vector_estacionario):
     # La entropia de orden 0 se calcula como -sum(p * log(p)) para cada estado
     entropia = 0
-    for i in range(len(vector_estacionario)):
-        if vector_estacionario[i] > 0:  # Evitar log(0) pq da error
-            entropia -= vector_estacionario[i] * np.log2(vector_estacionario[i])
+    for i in vector_estacionario.index:  # Recorremos los indices del vector estacionario):
+        if vector_estacionario.loc[i] > 0:  # Evitar log(0) pq da error
+            entropia -= vector_estacionario.loc[i] * np.log2(vector_estacionario.loc[i])
     return entropia
 
 """# Definimos una funcion para calcular la entropia condicional
@@ -362,12 +369,12 @@ def calcular_entropia_condicional(matriz_conjunta):
     
 def calcular_entropia_condicional(matriz_transicion, vector_estacionario):
     entropia_condicional = 0
-    for i in range(3):
+    for entrada in matriz_transicion.columns:  # Recorremos las columnas de la matriz de transicion
         h_i = 0
-        for j in range(3):
-            if matriz_transicion[j, i] > 0: #j,i la entrada esta en las columnas
-                h_i -= matriz_transicion[j, i] * np.log2(matriz_transicion[j, i])
-        entropia_condicional += vector_estacionario[i] * h_i
+        for salida in matriz_transicion.index:  # Recorremos las filas de la matriz de transicion
+            if matriz_transicion.loc[salida, entrada] > 0: # Evitar log(0) pq da error
+                h_i -= matriz_transicion.loc[salida, entrada] * np.log2(matriz_transicion.loc[salida, entrada])
+        entropia_condicional += vector_estacionario[entrada[0]] * h_i
     return entropia_condicional
 
 # Calculamos la entropia de orden 0 y 1 para cada dataset
@@ -399,8 +406,6 @@ class NodoHuffmann:
     
 
 def calcular_huffman(probabilidades):
-    #########################n = len(probabilidades)
-    
     #Creamos el minheap para almacenar los nodos y acceder de manera eficiente a los menor probabilidad
     codequeue = []
     for simbolo, probabilidad in probabilidades.items():
@@ -434,32 +439,33 @@ def calcular_huffman(probabilidades):
     
     generar_codigos_huffman(raiz)
     #Pasamos el diccionario a un DataFrame
-    codigos = pd.DataFrame(list(codigos.items()), columns=['Simbolo', 'Codigo']) #ARREGLAR ACA LO DE AXIS y COLUMN
+    codigos = pd.DataFrame(list(codigos.items()),columns=['Simbolo', 'Codigo'])
+    codigos = codigos.set_index('Simbolo')
     return codigos
 
 #llamamos a la funcion de codificacion de Huffman para cada dataset
 codigos_huffman_oslo = calcular_huffman({
-    'F': vector_estacionario_oslo[0],
-    'T': vector_estacionario_oslo[1],
-    'C': vector_estacionario_oslo[2]
+    'F': vector_estacionario_oslo.loc['F'],
+    'T': vector_estacionario_oslo.loc['T'],
+    'C': vector_estacionario_oslo.loc['C']
 })
-print("Códigos de Huffman para Oslo:", codigos_huffman_oslo)
+print("Códigos de Huffman para Oslo:\n", codigos_huffman_oslo)
 
 #Calculamos para quito
 codigos_huffman_quito = calcular_huffman({
-    'F': vector_estacionario_quito[0],
-    'T': vector_estacionario_quito[1],
-    'C': vector_estacionario_quito[2]
+    'F': vector_estacionario_quito.loc['F'],
+    'T': vector_estacionario_quito.loc['T'],
+    'C': vector_estacionario_quito.loc['C']
 })
-print("Códigos de Huffman para Quito:", codigos_huffman_quito)
+print("Códigos de Huffman para Quito:\n", codigos_huffman_quito)
 
 #Calculamos para melbourne
 codigos_huffman_melbourne = calcular_huffman({
-    'F': vector_estacionario_melbourne[0],
-    'T': vector_estacionario_melbourne[1],
-    'C': vector_estacionario_melbourne[2]
+    'F': vector_estacionario_melbourne.loc['F'],
+    'T': vector_estacionario_melbourne.loc['T'],
+    'C': vector_estacionario_melbourne.loc['C']
 })
-print("Códigos de Huffman para Melbourne:", codigos_huffman_melbourne)
+print("Códigos de Huffman para Melbourne:\n", codigos_huffman_melbourne)
 
 #Extendemos las fuentes a orden 2
 def extender_fuente_orden_2(matriz_transicion, vector_estacionario):
@@ -469,10 +475,11 @@ def extender_fuente_orden_2(matriz_transicion, vector_estacionario):
     for i in range(3):
         for j in range(3):
             estado = estados[i] + estados[j]
-            probabilidad = matriz_transicion[j, i] * vector_estacionario[i]
+            probabilidad = matriz_transicion.loc[estados[j]+'y', estados[i]+'x'] * vector_estacionario.loc[estados[i]]
             fuente_orden_2[estado] = probabilidad
     # Guardamos en un DF para mayor legibilidad
-    fuente_orden_2 = pd.DataFrame(list(fuente_orden_2.items()), columns=['Estado', 'Probabilidad'])
+    fuente_orden_2 = pd.DataFrame(list(fuente_orden_2.items()), columns=['Simbolo', 'Probabilidad'])
+    fuente_orden_2.set_index('Simbolo', inplace=True)
     return fuente_orden_2
 
 # Extendemos las fuentes a orden 2 para cada dataset
@@ -487,7 +494,8 @@ print("Fuente de orden 2 para Melboure\n:", fuente_orden_2_melbourne)
 #calculamos los codigos de Huffman para las fuentes de orden 2
 #primero pasamos las probabilidades de la fuente de orden 2 a un diccionario
 def calcular_huffman_orden_2(fuente_orden_2):
-    probabilidades = {row['Estado']: row['Probabilidad'] for _, row in fuente_orden_2.iterrows()}
+    probabilidades = fuente_orden_2['Probabilidad'].to_dict()
+    print("Probabilidades de la fuente de orden 2:\n", probabilidades,"\n")
     return calcular_huffman(probabilidades)
 
 codigos_huffman_orden_2_oslo = calcular_huffman_orden_2(fuente_orden_2_oslo)
@@ -507,15 +515,20 @@ def calcular_limite_huffman(H1,Hcond=0,n=1):
     limite_superior = limite_inferior + 1/n
     return limite_inferior, limite_superior
 
-def calcular_longitud_media(codigos_huffman, fuente):
-    longitud_total = 0
-    for _, row in codigos_huffman.iterrows():
-        simbolo = row['Simbolo']
-        codigo = row['Codigo']
-        probabilidad = fuente[fuente['Estado'] == simbolo]['Probabilidad'].values[0] #Values pq devuelve una serie pandas
-        longitud_total += len(codigo) * probabilidad
-
-    return longitud_total
+def calcular_longitud_media(df_probabilidades, df_codigos):
+    # Combinar ambos DataFrames por el índice (Simbolo)
+    df_combinado = df_probabilidades.join(df_codigos)
+    
+    # Calcular la longitud de cada código
+    df_combinado['Longitud'] = df_combinado['Codigo'].str.len()
+    
+    # Multiplicar probabilidad por longitud
+    df_combinado['Prob_x_Long'] = df_combinado['Probabilidad'] * df_combinado['Longitud']
+    
+    # Sumar todo para obtener la longitud promedio
+    longitud_promedio = df_combinado['Prob_x_Long'].sum()
+    
+    return longitud_promedio
 
 #Comparamos los limites de longitud de los codigos de Huffman con la longitud media por simbolo de los codigos
 #Oslo
@@ -543,7 +556,7 @@ print(f"Longitud media por simbolo de los codigos de Huffman para Melbourne: {lo
 def codificar_temperaturas(simbolos_sin_comprimir, codigos_huffman):
     codificacion = ''
     for simbolo in simbolos_sin_comprimir:
-        codigo = codigos_huffman[codigos_huffman['Simbolo'] == simbolo]['Codigo'].values[0]
+        codigo = codigos_huffman.loc[simbolo]['Codigo']
         codificacion += codigo
     return codificacion
 
@@ -572,14 +585,14 @@ codificacion_melbourne = codificar_temperaturas(melbourne_dataset['clima'].tolis
 print("\nLongitud de la codificación de Oslo:", len(codificacion_oslo), "bits")
 # Comparamos con la longitud de la codificación sin compresión, suponiendo que cada simbolo ocupa 1 byte (tamano de char)
 print("La longitud de la codificación sin compresión sería:", len(oslo_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de:", (len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100, "%")
+print("Por lo tanto, la compresión es de: %{:.3f}".format((len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100), "%")
 # Repetimos para las otras 2
 print("\nLongitud de la codificación de Quito:", len(codificacion_quito), "bits")
 print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de:", (len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100, "%")
+print("Por lo tanto, la compresión es de: %{:.3f}".format((len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100), "%")
 print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne), "bits")
-print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")  
-print("Por lo tanto, la compresión es de:", (len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100, "%")
+print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")
+print("Por lo tanto, la compresión es de: %{:.3f}".format((len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100), "%")
 
 #-------------------------------- ORDEN 2 --------------------------------#
 # Codificamos las temperaturas de cada ciudad
@@ -592,19 +605,19 @@ codificacion_melbourne = codificar_temperaturas_orden_2(melbourne_dataset['clima
 print("\nLongitud de la codificación de Oslo:", len(codificacion_oslo), "bits")
 # Comparamos con la longitud de la codificación sin compresión
 print("La longitud de la codificación sin compresión sería:", len(oslo_dataset) * 8, "bits")  # 1B por simbolo, pq no estan juntos en el dataset
-print("Por lo tanto, la compresión es de:", (len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100, "%")
+print("Por lo tanto, la compresión es de: %{:.3f}".format((len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100), "%")
 
 #Repetimos para las otras 2
 
 #Quito
 print("\nLongitud de la codificación de Quito:", len(codificacion_quito), "bits")
-print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")  
-print("Por lo tanto, la compresión es de:", (len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100, "%")
+print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")
+print("Por lo tanto, la compresión es de: %{:.3f}".format((len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100), "%")
 
 #Melbourne
 print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne), "bits")
 print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de:", (len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100, "%")
+print("Por lo tanto, la compresión es de: %{:.3f}".format((len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100), "%")
 
 #---------------------------------------------------- Parte 4 ------------------------------------------------------------------------------#
 
@@ -615,36 +628,18 @@ melbourne_ruidoso_dataset['clima_entrada'] = melbourne_dataset['clima']
 melbourne_ruidoso_dataset['clima_salida'] = melbourne_ruidoso_dataset['AvgTemperature'].apply(funcion_disc)
 print("\nDatos de entrada y salida de Melbourne ruidoso:\n", melbourne_ruidoso_dataset)
 
-# Definimos la funcion que calcule la matriz de transicion del canal, teniendo en cuenta la entrada clima y la salida clima
-def calcular_matriz_conjunta_canal(dataset):
-    estados = ['F', 'T', 'C']
-    suma_entradas = {'F': 0, 'T': 0, 'C': 0}  # Suma de las entradas para cada estado PQ?!!??!?!?!?!?!?!?!?!?!?!?!
-    matriz_transicion = pd.DataFrame(0, index=estados, columns=estados, dtype=float)
-    for i in range(len(dataset)):
-        entrada = dataset['clima_entrada'].iloc[i]
-        salida = dataset['clima_salida'].iloc[i]
-        matriz_transicion.loc[entrada,salida] += 1
-        suma_entradas[entrada] += 1
-    # Frecuencias a probabilidades
-    matriz_transicion/=dataset['clima_entrada'].size
-    return matriz_transicion
-
-#Calculamos la matriz de transicion del canal T4
-matriz_conjunta_t4 = calcular_matriz_conjunta_canal(melbourne_ruidoso_dataset)
-print("\nMatriz conjunta del canal T4:\n", matriz_conjunta_t4)
-
 # Calculamos la matriz de transicion del canal T4
-matriz_transicion_t4 = calcular_matriz_transicion(matriz_conjunta_t4)
+matriz_transicion_t4 = calcular_matriz_transicion(melbourne_ruidoso_dataset['clima_entrada'], melbourne_ruidoso_dataset['clima_salida'])
 print("\nMatriz de transición del canal T4:\n", matriz_transicion_t4)
 #Calculamos el ruido del canal
 def calcular_ruido_canal(matriz_transicion,vector_estacionario): # El estacionario es F T C
-    rx = [0, 0, 0]  # Inicializamos el vector de ruido para cada estado
-    for i in range(3):
-        for j in range(3):
-            if matriz_transicion.iloc[j, i] > 0:
-                rx[i] -= matriz_transicion.iloc[j, i] * np.log2(matriz_transicion.iloc[j, i])
-    ruido = rx[0] * vector_estacionario[0] + rx[1] * vector_estacionario[1] + rx[2] * vector_estacionario[2]
-    return ruido #VER QUE EL ESTACIONARIO ESTE EN ESTE ORDEN!!!!
+    rx = {'F':0, 'T':0, 'C':0}  # Inicializamos el vector de ruido para cada estado
+    for entrada in matriz_transicion.columns:  
+        for salida in matriz_transicion.index:
+            if matriz_transicion.loc[salida, entrada] > 0:
+                rx[entrada[0]] -= matriz_transicion.loc[salida, entrada] * np.log2(matriz_transicion.loc[salida, entrada])
+    ruido = rx['F'] * vector_estacionario['F'] + rx['T'] * vector_estacionario['T'] + rx['C'] * vector_estacionario['C']
+    return ruido
 
 ruido_canal = calcular_ruido_canal(matriz_transicion_t4, vector_estacionario_melbourne)
 print("\nRuido del canal T4:", ruido_canal)
@@ -652,15 +647,15 @@ print("\nRuido del canal T4:", ruido_canal)
 # Calculamos la informacion mutua del canal
 def calcular_informacion_mutua(matriz_transicion, vector_estacionario):
     #Primero, calculamos la distribucion de la salida
-    dist_y = np.zeros(3)
-    for i in range(3):
-        for j in range(3):
-            dist_y[j] += matriz_transicion.iloc[j, i] * vector_estacionario[i]
+    dist_y = {'F': 0, 'T': 0, 'C': 0}
+    for entrada in matriz_transicion.columns:
+        for salida in matriz_transicion.index:
+            dist_y[salida[0]] += matriz_transicion.loc[salida, entrada] * vector_estacionario[entrada[0]]
     #Despues calculamos la informacion mutua con el dato obtenido
     informacion_mutua = 0
-    for i in range(3):
-        if dist_y[i] > 0:
-            informacion_mutua += dist_y[i] * np.log2(dist_y[i])
+    for estado in ['F', 'T', 'C']:
+        if dist_y[estado] > 0:
+            informacion_mutua -= dist_y[estado] * np.log2(dist_y[estado])
     return informacion_mutua
 
 informacion_mutua_canal = calcular_informacion_mutua(matriz_transicion_t4, vector_estacionario_melbourne)
