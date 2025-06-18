@@ -652,11 +652,13 @@ def calcular_informacion_mutua(matriz_transicion, vector_estacionario):
         for salida in matriz_transicion.index:
             dist_y[salida[0]] += matriz_transicion.loc[salida, entrada] * vector_estacionario[entrada[0]]
     #Despues calculamos la informacion mutua con el dato obtenido
-    informacion_mutua = 0
+    Hy = 0
     for estado in ['F', 'T', 'C']:
         if dist_y[estado] > 0:
-            informacion_mutua -= dist_y[estado] * np.log2(dist_y[estado])
-    return informacion_mutua
+            Hy -= dist_y[estado] * np.log2(dist_y[estado])
+    return Hy - ruido_canal
 
 informacion_mutua_canal = calcular_informacion_mutua(matriz_transicion_t4, vector_estacionario_melbourne)
 print("Información mutua del canal T4:", informacion_mutua_canal)
+
+
