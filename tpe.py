@@ -34,7 +34,7 @@ print("Datos de Oslo:")
 atipicos_oslo = analizar_rango_intercuartil(oslo_dataset)
 # Vemos como existen valores fuera del rango intercuartil pero que no son outliers, como -21,-22,-23. Pero valores como -73 son imposibles
 # Procedemos a imputar por media los valores atípicos del dataset de Oslo
-oslo_dataset.loc[atipicos_oslo.index, 'AvgTemperature'] = int(round(oslo_dataset['AvgTemperature'].mean()))
+oslo_dataset.loc[atipicos_oslo.index, 'AvgTemperature'] = int(round(oslo_dataset[oslo_dataset['AvgTemperature'] > -40]['AvgTemperature'].mean()))
 
 # Repetimos el proceso para las otras ciudades
 print("\nDatos de Quito:")
