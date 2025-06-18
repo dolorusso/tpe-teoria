@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import heapq
 # Configuracion de librerias
-#Mostramos 3 decimales, no usamos notacion cientifica y mostramos los numeros flotantes enteros(esto es para que cuando sean 0 se vean igual)
+# Mostramos 3 decimales, no usamos notacion cientifica y mostramos los numeros flotantes con cantidad de decimales fijos
 np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
+pd.set_option('display.float_format', '{:.3f}'.format)
 
-
-# Abrimos el archivo usando una función específica de pandas
+# Abrimos los archivos CSV que contienen los datos de temperatura promedio diaria de todas las ciudades
 oslo_dataset = pd.read_csv("temperature_Oslo_celsius.csv")
 quito_dataset = pd.read_csv("temperature_Quito_celsius.csv")
 melbourne_dataset = pd.read_csv("temperature_Melbourne_celsius.csv")
@@ -17,10 +17,9 @@ melbourne_ruidoso_dataset = pd.read_csv('temperature_Melbourne_celsius_ruidoso.c
 
 
 #---------------------------------------------Limpieza de datos---------------------------------------------------
-"""
+
 # Función para detectar valores atípicos utilizando como criterio el rango intercuartil
-# Esta función recibe un dataset y devuelve los valores atípicos, Q1, Q3 e IQR en ese orden
-"""
+
 def analizar_rango_intercuartil(dataset):
     q1 = dataset['AvgTemperature'].quantile(0.25)
     q3 = dataset['AvgTemperature'].quantile(0.75)
@@ -28,29 +27,28 @@ def analizar_rango_intercuartil(dataset):
     atipicos = dataset[(dataset['AvgTemperature'] < (q1 - 1.5 * iqr)) | (dataset['AvgTemperature'] > (q3 + 1.5 * iqr))]
     print(f"Q1: {q1}, Q3: {q3}, IQR: {iqr}")
     print(f"Valores atípicos: {atipicos['AvgTemperature'].values}")
-    return atipicos, q1, q3, iqr
+    return atipicos
 
 print("Datos de Oslo:")
 # Utilizamos la función para analizar el rango intercuartil de Oslo
-atipicos_oslo, q1_oslo, q3_oslo, iqr_oslo = analizar_rango_intercuartil(oslo_dataset)
+atipicos_oslo = analizar_rango_intercuartil(oslo_dataset)
 # Vemos como existen valores fuera del rango intercuartil pero que no son outliers, como -21,-22,-23. Pero valores como -73 son imposibles
-# Procedemos a eliminar los valores atípicos del dataset de Oslo
-oslo_dataset = oslo_dataset[(oslo_dataset['AvgTemperature'] > -40)]
+# Procedemos a imputar por media los valores atípicos del dataset de Oslo
+oslo_dataset.loc[atipicos_oslo.index, 'AvgTemperature'] = int(round(oslo_dataset['AvgTemperature'].mean()))
 
+# Repetimos el proceso para las otras ciudades
 print("\nDatos de Quito:")
-# Repetimos el proceso para Quito
-atipicos_quito, q1_quito, q3_quito, iqr_quito = analizar_rango_intercuartil(quito_dataset)
-# Existen una gran cantidad de posibles valores atípicos en Quito, pero no lo son. Esto se debe a la poca variación de la temperatura en esta ciudad
+atipicos_quito = analizar_rango_intercuartil(quito_dataset)
+# Existen una gran cantidad de posibles valores atípicos en Quito, pero no lo son. 
+# Esto se debe a que la poca variación de la temperatura de la ciudad produce que el rango intercuartil sea muy pequeño
 
 print("\nDatos de Melbourne:")
-# Repetimos el proceso para Melbourne
-atipicos_melbourne, q1_melbourne, q3_melbourne, iqr_melbourne = analizar_rango_intercuartil(melbourne_dataset)
-
+atipicos_melbourne = analizar_rango_intercuartil(melbourne_dataset)
+print(atipicos_melbourne.index)
 # Igual que en Oslo, existen valores muy fuera del rango con valor -73, procedemos a eliminarlos
-#Antes guardamos el indice de los valores atípicos para poder eliminarlos en segundo dataset de melbourne
-indices_atipicos_melbourne = atipicos_melbourne.index
-melbourne_dataset = melbourne_dataset[(melbourne_dataset['AvgTemperature'] > -40)]
-melbourne_ruidoso_dataset = melbourne_ruidoso_dataset.drop(indices_atipicos_melbourne, axis=0)
+media_melbourne = int(round(melbourne_dataset[melbourne_dataset['AvgTemperature'] > -40]['AvgTemperature'].mean()))
+melbourne_dataset.loc[atipicos_melbourne.index, 'AvgTemperature'] = media_melbourne
+melbourne_ruidoso_dataset.loc[atipicos_melbourne.index, 'AvgTemperature'] = media_melbourne
 
 #-----------------------------------------------------------------------PARTE 1--------------------------------------------------------------------
 
@@ -69,7 +67,7 @@ def calcular_desvio_estandar(dataset,media):
     return (suma_cuadrados / len(dataset['AvgTemperature'])) ** 0.5
 
 
-# Crear diccionario con lo pedido
+# Calculamos y juntamos los resultados para guardarlos en un dataframe
 media_desvio_ciudades = {
     'Ciudad': ['Oslo', 'Quito', 'Melbourne'],
     'Media': [
@@ -83,22 +81,30 @@ media_desvio_ciudades['Desvio_Estandar'] = [
     calcular_desvio_estandar(quito_dataset, media_desvio_ciudades['Media'][1]),
     calcular_desvio_estandar(melbourne_dataset, media_desvio_ciudades['Media'][2])
 ]
-media_desvio_df = pd.DataFrame(media_desvio_ciudades)  
-# Creamos una tabla en la que se muestra la media de la temperatura y el desvio estandar de cada ciudad
-print(media_desvio_df)
+media_desvio_df = pd.DataFrame(media_desvio_ciudades)
+# Establecemos la columna 'Ciudad' como índice de la tabla, para no la fila con indices numericos
+media_desvio_df.set_index('Ciudad', inplace=True)
 
-#Para complementar estos datos, los analizaremos junto a la distribución de las temperaturas de cada ciudad.
-#Realizamos el histograma de las temperaturas de cada ciudad para observar la distribución de los datos.
+# Ejecutar la función
+from graficas import mostrar_tabla_matplotlib
+'mostrar_tabla_matplotlib(media_desvio_df)'
+
+
+
+# Para complementar estos datos, los analizaremos junto a la distribución de las temperaturas de cada ciudad.
+# Realizamos el histograma de las temperaturas de cada ciudad para observar la distribución de los datos.
 
 def crear_histograma(dataset, ciudad,rangox):
     plt.figure(figsize=(15, 5))
-    plt.hist(dataset['AvgTemperature'], bins=30, alpha=0.7, label=ciudad,edgecolor='black')
+    valores_unicos = sorted(dataset['AvgTemperature'].unique())
+    bins = [v - 0.5 for v in range(int(min(valores_unicos)), int(max(valores_unicos)) + 2)]
+    plt.hist(dataset['AvgTemperature'], bins=bins, alpha=0.7, label=ciudad, edgecolor='black')
     plt.title(f'Distribución de Temperaturas en {ciudad}')
     plt.xlabel('Temperatura (°C)')
     plt.ylabel('Frecuencia')
     #Agregamos la media y el desvío estándar al gráfico
-    media = media_desvio_df[media_desvio_df['Ciudad'] == ciudad]['Media'].values[0]
-    desvio_estandar = media_desvio_df[media_desvio_df['Ciudad'] == ciudad]['Desvio_Estandar'].values[0]
+    media = media_desvio_df.loc[ciudad]['Media']
+    desvio_estandar = media_desvio_df.loc[ciudad]['Desvio_Estandar']
     plt.axvline(media, color='red', linestyle='dashed', linewidth=1, label=f'Media: {media:.2f}°C')
     plt.axvline(media + desvio_estandar, color='green', linestyle='dashed', linewidth=1, label=f'+1 Desvío Estándar: {media + desvio_estandar:.2f}°C')
     plt.axvline(media - desvio_estandar, color='green', linestyle='dashed', linewidth=1, label=f'-1 Desvío Estándar: {media - desvio_estandar:.2f}°C')
@@ -111,10 +117,14 @@ def crear_histograma(dataset, ciudad,rangox):
 
 
 # Creamos los histogramas para cada ciudad
-#crear_histograma(oslo_dataset, 'Oslo',range(-25,25,5))
-#crear_histograma(quito_dataset, 'Quito',range(10,20,2))
-#crear_histograma(melbourne_dataset, 'Melbourne',range(5,30,5))
 
+""" ------------------------ DESCOMENTAR DESPUES ------------------------
+crear_histograma(oslo_dataset, 'Oslo',range(-25,25,5))
+crear_histograma(quito_dataset, 'Quito',range(10,20,1))
+crear_histograma(melbourne_dataset, 'Melbourne',range(5,30,5))
+"""
+
+""" VER QUE HACEMOS CON ESTOS GRAFICOS
 #Grafico que muestra cada valor con su indice en el dataset
 def crear_grafico_valores(dataset, ciudad):
     plt.figure(figsize=(15, 5))
@@ -122,27 +132,27 @@ def crear_grafico_valores(dataset, ciudad):
     plt.title(f'Temperaturas en {ciudad} a lo largo del tiempo')
     plt.xlabel('Dia')
     plt.ylabel('Temperatura (°C)')
-    plt.axhline(media_desvio_df[media_desvio_df['Ciudad'] == ciudad]['Media'].values[0], color='red', linestyle='dashed', linewidth=1, label='Media')
+    plt.axhline(media_desvio_df.loc[ciudad]['Media'], color='red', linestyle='dashed', linewidth=1, label='Media')
     plt.legend()
     plt.show()
 
 crear_grafico_valores(oslo_dataset, 'Oslo')
 crear_grafico_valores(quito_dataset, 'Quito')
-crear_grafico_valores(melbourne_dataset, 'Melbourne')
+crear_grafico_valores(melbourne_dataset, 'Melbourne')"""
 
 
 #Quito tiene la temperatura media más estable (desvío estándar más bajo: ~1.3 °C), lo cual es típico de una ciudad ecuatorial con clima templado todo el año.
 #Oslo muestra la mayor variabilidad térmica (desvío estándar de ~8.79 °C) por lo que tiene un clima más cambiante.
 #Melbourne tiene la media más alta (~17.8 °C), pero también muestra una variabilidad moderada (desvío estándar de ~4.25 °C), lo que sugiere un clima templado oceánico con cambios frecuentes.
-"""
+
 #Funcion que calcula el factor de correlacion cruzado entre dos datasets 
 def calcular_correlacion_cruzada(dataset1, dataset2,nombre_ciudad1, nombre_ciudad2):
     if len(dataset1) != len(dataset2):
         raise ValueError("Los datasets deben tener la misma longitud")
     
-    media1 = media_desvio_ciudades[media_desvio_df['Ciudad'] == nombre_ciudad1]['Media'].values[0]
-    media2 = media_desvio_ciudades[media_desvio_df['Ciudad'] == nombre_ciudad2]['Media'].values[0]
-    
+    media1 = media_desvio_df.loc[nombre_ciudad1]['Media']
+    media2 = media_desvio_df.loc[nombre_ciudad2]['Media']
+
     numerador = sum((dataset1['AvgTemperature'][i] - media1) * (dataset2['AvgTemperature'][i] - media2) for i in range(len(dataset1)))
     denominador = (sum((dataset1['AvgTemperature'][i] - media1) ** 2 for i in range(len(dataset1))) * 
                    sum((dataset2['AvgTemperature'][i] - media2) ** 2 for i in range(len(dataset2)))) ** 0.5
@@ -155,8 +165,23 @@ def calcular_correlacion_cruzada(dataset1, dataset2,nombre_ciudad1, nombre_ciuda
 print("\nCorrelación cruzada entre Oslo y Quito:", calcular_correlacion_cruzada(oslo_dataset, quito_dataset, 'Oslo', 'Quito'))
 print("Correlación cruzada entre Oslo y Melbourne:", calcular_correlacion_cruzada(oslo_dataset, melbourne_dataset, 'Oslo', 'Melbourne'))
 print("Correlación cruzada entre Quito y Melbourne:", calcular_correlacion_cruzada(quito_dataset, melbourne_dataset, 'Quito', 'Melbourne'))
-"""
-##QUE HACEMOS CON LOS DATASETS Q SOPN DE TAMANIO DIFERENTE?
+
+#Graficos de dispersion para comparar las temperaturas de las ciudades
+def crear_grafico_dispersion(dataset1, dataset2, nombre_ciudad1, nombre_ciudad2, rangox=(-30, 30)):
+    plt.figure(figsize=(10, 6))
+    plt.scatter(dataset1['AvgTemperature'], dataset2['AvgTemperature'], alpha=0.5)
+    plt.title(f'Gráfico de Dispersión: {nombre_ciudad1} vs {nombre_ciudad2}')
+    plt.xlabel(f'Temperatura en {nombre_ciudad1} (°C)')
+    plt.ylabel(f'Temperatura en {nombre_ciudad2} (°C)')
+    plt.grid(True)
+    plt.axis('equal')
+    plt.xticks(ticks=range(rangox[0], rangox[1]+1, 10))
+    plt.show()
+    
+crear_grafico_dispersion(oslo_dataset, quito_dataset, 'Oslo', 'Quito')
+crear_grafico_dispersion(oslo_dataset, melbourne_dataset, 'Oslo', 'Melbourne')
+crear_grafico_dispersion(quito_dataset, melbourne_dataset, 'Quito', 'Melbourne', rangox=(10, 30))
+
 #-----------------------------------------------------------------------PARTE 2--------------------------------------------------------------------
 
 #F (frío): si t < 11°C
@@ -170,67 +195,28 @@ oslo_dataset['clima'] = oslo_dataset['AvgTemperature'].apply(funcion_disc)
 quito_dataset['clima'] = quito_dataset['AvgTemperature'].apply(funcion_disc)
 melbourne_dataset['clima'] = melbourne_dataset['AvgTemperature'].apply(funcion_disc)
 
-#matriz de probabilidad conjunta
-def calcular_matriz_conjunta(df):
+# Función para calcular la probabilidad de transición
+def calcular_matriz_transicion(entrada,salida):
+    matriz_transicion = pd.DataFrame(0, index=['Fy', 'Ty', 'Cy'], columns=['Fx', 'Tx', 'Cx'])
+    probabilidadMarginal = {'Fx': 0, 'Tx': 0, 'Cx': 0}
+    # Recorremos la entrada y salida y vamos contando las transiciones
+    for i in range(len(entrada) - 1):
+        estado_actual = entrada[i] + 'x'
+        estado_siguiente = salida[i] + 'y'
+        probabilidadMarginal[estado_actual] += 1
+        matriz_transicion.loc[estado_siguiente, estado_actual] += 1
+    # Normalizamos la matriz de transición dividiendo cada columna por la probabilidad marginal de esa columna
+    for estado,valor in probabilidadMarginal.items():
+            matriz_transicion[estado] /= valor
 
-    # Obtener los estados únicos
-    states = ['F', 'T', 'C']
-    
-    # Crear un diccionario para mapear estados a índices, asi puedo acceder a la matriz con indices numericos
-    estado_indice = {state: i for i, state in enumerate(states)}
-    
-    # Inicializar matriz de conteos
-    matriz_conjunta = np.zeros((3, 3))
-    
-    # Contar los eventos
-    cantidad_eventos = len(df) - 1 #-1
-    for i in range(cantidad_eventos):
-        x = df['clima'].iloc[i]
-        y = df['clima'].iloc[i + 1]
-        matriz_conjunta[estado_indice[x], estado_indice[y]] += 1
-
-    # Calcular la matriz conjunta dividiendo la cantidad de eventos por el total de eventos, precision 3 decimales
-    matriz_conjunta = matriz_conjunta / cantidad_eventos if cantidad_eventos > 0 else matriz_conjunta
-
-    '''# Convertir a DataFrame
-    matriz_df = pd.DataFrame(matriz_conjunta, index=states, columns=states)'''
-
-    return matriz_conjunta
-
-# Calcular la matriz de probabilidad conjunta para cada dataset, ya que esta matriz es la que utilizaremos para calcular otras
-matriz_conjunta_oslo = calcular_matriz_conjunta(oslo_dataset)
-matriz_conjunta_quito = calcular_matriz_conjunta(quito_dataset)
-matriz_conjunta_melbourne = calcular_matriz_conjunta(melbourne_dataset)
-
-print("Matriz de probabilidad conjunta de Oslo:\n" , matriz_conjunta_oslo)
-print("Matriz de probabilidad conjunta de Quito:\n" , matriz_conjunta_quito)
-print("Matriz de probabilidad conjunta de Melbourne:\n" , matriz_conjunta_melbourne)
-
-print("verificar suma da 1: ", np.sum(matriz_conjunta_oslo) == 1)
-print("verificar suma da 1: ", np.sum(matriz_conjunta_quito) == 1)
-print("verificar suma da 1: ", np.sum(matriz_conjunta_melbourne) == 1)
-
-# Función para calcular la probabilidad de transición a partir de la matriz conjunta
-def calcular_matriz_transicion(matriz_conjunta):
-    #Obtenemos la probilidad de cada columna
-    prob_marginal_x = [0] * 3
-    for i in range(3):
-        prob_marginal_x[i] = matriz_conjunta[i,0] + matriz_conjunta[i,1] + matriz_conjunta[i,2]
-
-    # Inicializar matriz de transición
-    matriz_transicion = np.zeros((3, 3))
-    for i in range(3):
-        for j in range(3):
-            # Calcular la probabilidad de transición
-            matriz_transicion[i, j] = matriz_conjunta[i, j] / prob_marginal_x[j] if prob_marginal_x[j] > 0 else 0
     return matriz_transicion
 
 
-# Calculamos la matriz de transicion para cada dataset
-matriz_transicion_oslo = calcular_matriz_transicion(matriz_conjunta_oslo)
-matriz_transicion_quito = calcular_matriz_transicion(matriz_conjunta_quito)
-matriz_transicion_melbourne = calcular_matriz_transicion(matriz_conjunta_melbourne)
 
+# Calculamos la matriz de transicion para cada dataset
+matriz_transicion_oslo = calcular_matriz_transicion(oslo_dataset['clima'], oslo_dataset['clima'].iloc[1:].reset_index(drop=True))
+matriz_transicion_quito = calcular_matriz_transicion(quito_dataset['clima'], quito_dataset['clima'].iloc[1:].reset_index(drop=True))
+matriz_transicion_melbourne = calcular_matriz_transicion(melbourne_dataset['clima'], melbourne_dataset['clima'].iloc[1:].reset_index(drop=True))
 
 # Imprimimos las matrices de transicion
 print("Matriz de transición de Oslo:\n", matriz_transicion_oslo)
@@ -239,14 +225,18 @@ print("Matriz de transición de Melbourne:\n", matriz_transicion_melbourne)
 
 #----------------------------------------------------CALCULO DEL VECTOR ESTACIONARIO----------------------------------------------------
 
-#A partir de esta matriz de transicion, calcularemos el vector estacionario con motor de monte carlo
+#A partir de la matriz de transicion, calcularemos el vector estacionario con motor de monte carlo
 # Definimos una funcion que calcula la matriz acumulada de cada fuente
 def calcular_matriz_acumulada(matriz_transicion):
-    matriz_resultado = np.zeros((3, 3))  # Inicializamos la matriz de resultado
-    matriz_resultado = matriz_transicion.copy()  # Copiamos la primer fila
-    for i in range(1,3):
-        for j in range(0,3):
-            matriz_resultado[i, j] += matriz_resultado[i-1, j]
+    matriz_np = matriz_transicion.values
+
+    # Crear matriz resultado copiando la matriz original
+    matriz_resultado = matriz_np.copy()
+    # Recorrer la matriz lugar por lugar para calcular la suma acumulativa
+    filas, columnas = matriz_resultado.shape
+    for i in range(1, filas):  # Empezamos desde la segunda fila
+        for j in range(columnas):
+            matriz_resultado[i, j] = matriz_resultado[i-1, j] + matriz_resultado[i, j]
     return matriz_resultado
 
 # Definimos la matriz acumulada de cada fuente
@@ -275,7 +265,7 @@ def generar_proximo_estado(matriz_acumulada, simbolo_anterior):
     raise ValueError("No se pudo generar el próximo estado, matriz acumulada no válida.")
 
 
-def calcular_vector_estacionario(matriz_acumulada, e=0.0000001, min_iter=5000):
+def calcular_vector_estacionario(matriz_acumulada, e=0.000001, min_iter=5000):
     # Inicializar el vector estacionario
     emisiones = np.array([0, 0, 0])  # Contador de emisiones para cada estado
     Vt_actual = np.array([0, 0, 0])  # Vector de emisiones actual
@@ -316,7 +306,7 @@ def converge(media_actual, media_anterior, e=0.00001):
     return abs(media_actual - media_anterior) < e
 
 # Funcion para calcular el tiempo medio de primera recurrencia
-def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.001, min_iter=5000):
+def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.000001, min_iter=5000):
     retornos = 0
     media_actual = 0
     media_anterior = 0
@@ -409,7 +399,7 @@ class NodoHuffmann:
     
 
 def calcular_huffman(probabilidades):
-    n = len(probabilidades)
+    #########################n = len(probabilidades)
     
     #Creamos el minheap para almacenar los nodos y acceder de manera eficiente a los menor probabilidad
     codequeue = []
@@ -444,7 +434,7 @@ def calcular_huffman(probabilidades):
     
     generar_codigos_huffman(raiz)
     #Pasamos el diccionario a un DataFrame
-    codigos = pd.DataFrame(list(codigos.items()), columns=['Simbolo', 'Codigo'])
+    codigos = pd.DataFrame(list(codigos.items()), columns=['Simbolo', 'Codigo']) #ARREGLAR ACA LO DE AXIS y COLUMN
     return codigos
 
 #llamamos a la funcion de codificacion de Huffman para cada dataset
@@ -628,7 +618,7 @@ print("\nDatos de entrada y salida de Melbourne ruidoso:\n", melbourne_ruidoso_d
 # Definimos la funcion que calcule la matriz de transicion del canal, teniendo en cuenta la entrada clima y la salida clima
 def calcular_matriz_conjunta_canal(dataset):
     estados = ['F', 'T', 'C']
-    suma_entradas = {'F': 0, 'T': 0, 'C': 0}  # Suma de las entradas para cada estado
+    suma_entradas = {'F': 0, 'T': 0, 'C': 0}  # Suma de las entradas para cada estado PQ?!!??!?!?!?!?!?!?!?!?!?!?!
     matriz_transicion = pd.DataFrame(0, index=estados, columns=estados, dtype=float)
     for i in range(len(dataset)):
         entrada = dataset['clima_entrada'].iloc[i]
