@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import heapq
+
 # Configuracion de librerias
 # Mostramos 3 decimales, no usamos notacion cientifica y mostramos los numeros flotantes con cantidad de decimales fijos
 np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
@@ -258,49 +259,53 @@ def calcular_vector_estacionario(matriz_acumulada, e=0.000001, min_iter=5000):
     cantidad_simbolos = 0  # Contador de símbolos generados
     simbolo_actual = 0  # Estado actual, no importa su valor inicial al calcular el vector estacionario
 
-    while not converge_vector(Vt_actual, Vt_anterior, e) or cantidad_simbolos < min_iter:
-        # Generamos el proximo simbolo
-        simbolo_actual = generar_proximo_estado(matriz_acumulada, simbolo_actual)
-        emisiones[simbolo_actual] += 1
-        cantidad_simbolos += 1
-        # Actualizamos el vector de emisiones
-        Vt_anterior = Vt_actual.copy()
-        Vt_actual = emisiones / cantidad_simbolos
-    
-    return Vt_actual
-
-# --------------------------------------- GRAFICA DE CONVERGENCIA ------------------------------------ #
-# Modificación de tu función original para que también devuelva el historial
-def calcular_vector_estacionario_con_historial(matriz_acumulada, e=0.000001, min_iter=5000):
-    # Listas para almacenar la evolución
+    # Util para graficar luego
     historial_vectores = []
     
-    # Inicializar el vector estacionario
-    emisiones = np.array([0, 0, 0])  # Contador de emisiones para cada estado
-    Vt_actual = np.array([0, 0, 0])  # Vector de emisiones actual
-    Vt_anterior = np.array([0, 0, 0])  # Vector de emisiones anterior
-    cantidad_simbolos = 0  # Contador de símbolos generados
-    simbolo_actual = 0  # Estado actual
-    
     while not converge_vector(Vt_actual, Vt_anterior, e) or cantidad_simbolos < min_iter:
         # Generamos el proximo simbolo
         simbolo_actual = generar_proximo_estado(matriz_acumulada, simbolo_actual)
         emisiones[simbolo_actual] += 1
         cantidad_simbolos += 1
+        
         # Actualizamos el vector de emisiones
         Vt_anterior = Vt_actual.copy()
         Vt_actual = emisiones / cantidad_simbolos
-        
-        # Guardamos el historial cada cierto número de iteraciones
-        if cantidad_simbolos % 100 == 0:
-            historial_vectores.append((cantidad_simbolos, Vt_actual.copy()))
     
+    if cantidad_simbolos % 100 == 0:
+        historial_vectores.append((cantidad_simbolos, Vt_actual.copy()))
     return Vt_actual, historial_vectores
 
+def calcular_vector_estacionario_teorico(matriz_transicion):
+    
+    matriz_entrada = matriz_transicion.values
+    A = matriz_entrada - np.eye(matriz_entrada.shape[0])  # Restamos la matriz identidad
+    A[-1, :] = 1  # Reemplazamos la última fila por unos
+    b = np.zeros(matriz_entrada.shape[0])  # Vector de 0 (excepto el último elemento)
+    b[-1] = 1  # El último elemento del vector b es 1
+    A = np.linalg.inv(A)  
+    A = A * b.T
+    print("Matriz A:\n", A)
+
+    # Pasamos a DataFrame para seguir la misma estructura que antes
+    vector_estacionario = pd.Series(A[:, -1], index=['F', 'T', 'C'])
+    return vector_estacionario
+
+
+# --------------------------------------- GRAFICA DE CONVERGENCIA (ESTACIONARIO) ------------------------------------ #
+# Usaremos los estacionarios teoricos para mostrar como converger hacia el
+# vector estacionario teórico de cada ciudad
+vector_estacionario_oslo_teorico = calcular_vector_estacionario_teorico(matriz_transicion_oslo)
+vector_estacionario_quito_teorico = calcular_vector_estacionario_teorico(matriz_transicion_quito)
+vector_estacionario_melbourne_teorico = calcular_vector_estacionario_teorico(matriz_transicion_melbourne)
+
+# Modificación de tu función original para que también devuelva el historial
+
+
 # Función para graficar usando tu función original
-def graficar_convergencia_epsilon(matriz_acumulada, e=0.000001, min_iter=5000):
+def graficar_convergencia_epsilon(matriz_acumulada, estacionario_teorico, e=0.000001, min_iter=10000):
     # Llamar a tu función modificada
-    vector_final, historial = calcular_vector_estacionario_con_historial(matriz_acumulada, e, min_iter)
+    vector_final, historial = calcular_vector_estacionario(matriz_acumulada, e, min_iter)
     
     # Extraer los datos del historial
     iteraciones = [punto[0] for punto in historial]
@@ -313,7 +318,10 @@ def graficar_convergencia_epsilon(matriz_acumulada, e=0.000001, min_iter=5000):
     plt.plot(iteraciones, coord_0, 'r-', label='Coordenada 0 (F)', linewidth=2)
     plt.plot(iteraciones, coord_1, 'g-', label='Coordenada 1 (T)', linewidth=2)
     plt.plot(iteraciones, coord_2, 'b-', label='Coordenada 2 (C)', linewidth=2)
-    
+    plt.axhline(y=estacionario_teorico[0], color='r', linestyle='--', label='Vector Estacionario Teórico F')
+    plt.axhline(y=estacionario_teorico[1], color='g', linestyle='--', label='Vector Estacionario Teórico T')
+    plt.axhline(y=estacionario_teorico[2], color='b', linestyle='--', label='Vector Estacionario Teórico C')
+
     plt.xlabel('Número de Iteraciones')
     plt.ylabel('Valor de la Coordenada')
     plt.title(f'Convergencia del Vector Estacionario (ε = {e})')
@@ -321,44 +329,17 @@ def graficar_convergencia_epsilon(matriz_acumulada, e=0.000001, min_iter=5000):
     plt.grid(True, alpha=0.3)
     plt.show()
     
-    return vector_final
-
-# Función para comparar diferentes epsilons usando tu función original
-def comparar_epsilons(matriz_acumulada, epsilons=[0.01, 0.001, 0.0001], min_iter=5000):
-    plt.figure(figsize=(12, 8))
-    
-    for e in epsilons:
-        # Llamar a tu función para cada epsilon
-        vector_final, historial = calcular_vector_estacionario_con_historial(matriz_acumulada, e, min_iter)
-        
-        # Extraer datos
-        iteraciones = [punto[0] for punto in historial]
-        coord_0 = [punto[1][0] for punto in historial]
-        coord_1 = [punto[1][1] for punto in historial]
-        coord_2 = [punto[1][2] for punto in historial]
-        
-        # Graficar solo una coordenada por epsilon para claridad
-        plt.plot(iteraciones, coord_0, label=f'Coord 0, ε={e}', linewidth=2)
-        plt.plot(iteraciones, coord_1, label=f'Coord 1, ε={e}', linewidth=2, linestyle='--')
-        plt.plot(iteraciones, coord_2, label=f'Coord 2, ε={e}', linewidth=2, linestyle=':')
-    
-    plt.xlabel('Número de Iteraciones')
-    plt.ylabel('Valor de la Coordenada')
-    plt.title('Comparación de Convergencia para Diferentes Valores de ε')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
-    
+    return vector_final    
 
 # Comparar diferentes epsilons
-comparar_epsilons(matriz_acumulada_oslo, [0.01, 0.0001,0.000001])
+graficar_convergencia_epsilon(matriz_acumulada_oslo, vector_estacionario_oslo_teorico, e=0.00001, min_iter=5000)
 
 # --------------------------------------- FIN ---------------------------------------------- #
 
 # Calculamos el vector estacionario para cada dataset
-vector_estacionario_oslo = calcular_vector_estacionario(matriz_acumulada_oslo)
-vector_estacionario_quito = calcular_vector_estacionario(matriz_acumulada_quito)
-vector_estacionario_melbourne = calcular_vector_estacionario(matriz_acumulada_melbourne)
+vector_estacionario_oslo,_ = calcular_vector_estacionario(matriz_acumulada_oslo)
+vector_estacionario_quito,_ = calcular_vector_estacionario(matriz_acumulada_quito)
+vector_estacionario_melbourne,_ = calcular_vector_estacionario(matriz_acumulada_melbourne)
 
 # Imprimimos los vectores estacionarios
 print("Vector estacionario de Oslo:\n", vector_estacionario_oslo)
@@ -378,11 +359,16 @@ def converge(media_actual, media_anterior, e=0.00001):
 
 # Funcion para calcular el tiempo medio de primera recurrencia
 def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.0001, min_iter=5000):
+    # Inicializamos las variables necesarias
     retornos = 0
     media_actual = 0
     media_anterior = 0
     cantidad_iteraciones = 0
     simbolo_actual = estado_inicial
+    
+    # Para graficar luego
+    historial_convergencia = [] 
+    
     while not converge(media_actual, media_anterior, e) or cantidad_iteraciones < min_iter:
         # Generamos el proximo simbolo
         simbolo_actual = generar_proximo_estado(matriz_acumulada, simbolo_actual)
@@ -391,14 +377,18 @@ def calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e=0.0001, min_
             retornos += 1
             media_anterior = media_actual
             media_actual = cantidad_iteraciones / retornos
-    return media_actual
+            
+            if retornos % 10 == 0:  # Cada 10 retornos, guardo para graficar
+                historial_convergencia.append((retornos, media_actual))
+    
+    return media_actual, historial_convergencia
 
 # Calculamos el tiempo medio de primera recurrencia para cada dataset, para cada estado y guardamos en un dataframe
 def calcular_tiempos_recurrencia(matriz_acumulada, ciudad):
     estados = ['F', 'T', 'C']
     tiempos_recurrencia = {}
     for i, estado in enumerate(estados):
-        tiempo = calcular_tiempo_recurrencia(matriz_acumulada, i)
+        tiempo, _ = calcular_tiempo_recurrencia(matriz_acumulada, i)
         tiempos_recurrencia[estado] = tiempo
     return pd.DataFrame([tiempos_recurrencia], index=[ciudad])
 
@@ -407,33 +397,75 @@ tiempos_recurrencia_oslo = calcular_tiempos_recurrencia(matriz_acumulada_oslo, '
 tiempos_recurrencia_quito = calcular_tiempos_recurrencia(matriz_acumulada_quito, 'Quito')
 tiempos_recurrencia_melbourne = calcular_tiempos_recurrencia(matriz_acumulada_melbourne, 'Melbourne')
 
+# -------------------------------- GRAFICAR CONVERGENCIA DE TIEMPOS DE RECURRENCIA -------------------------------- #
+# Función para graficar la convergencia de un estado específico
+def graficar_convergencia_recurrencia(matriz_acumulada, estado_inicial, ciudad, estado_nombre, e=0.0001, min_iter=5000):
+    tiempo_final, historial = calcular_tiempo_recurrencia(matriz_acumulada, estado_inicial, e, min_iter)
+    
+    if len(historial) == 0:
+        print("No hay suficientes datos para graficar")
+        return tiempo_final
+    
+    # Extraer datos del historial
+    retornos = [punto[0] for punto in historial]
+    medias = [punto[1] for punto in historial]
+    
+    # Crear el gráfico
+    plt.figure(figsize=(12, 8))
+    plt.plot(retornos, medias, 'b-', linewidth=2, marker='o', markersize=4)
+    plt.axhline(y=tiempo_final, color='r', linestyle='--', alpha=0.7, label=f'Valor final: {tiempo_final:.2f}')
+    
+    plt.xlabel('Número de Retornos al Estado')
+    plt.ylabel('Tiempo Medio de Recurrencia')
+    plt.title(f'Convergencia del Tiempo de Recurrencia - {ciudad} - Estado {estado_nombre} (ε = {e})')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    
+    return tiempo_final
+
+# Función para comparar la convergencia de los 3 estados en un mismo gráfico
+def graficar_convergencia_todos_estados(matriz_acumulada, ciudad, e=0.0001, min_iter=5000):
+    estados = ['F', 'T', 'C']
+    colores = ['red', 'green', 'blue']
+    
+    plt.figure(figsize=(15, 10))
+    
+    for i, (estado, color) in enumerate(zip(estados, colores)):
+        tiempo_final, historial = calcular_tiempo_recurrencia(matriz_acumulada, i, e, min_iter)
+        
+        if len(historial) > 0:
+            retornos = [punto[0] for punto in historial]
+            medias = [punto[1] for punto in historial]
+            
+            plt.plot(retornos, medias, color=color, linewidth=2, marker='o', 
+                    markersize=3, label=f'Estado {estado} (final: {tiempo_final:.2f})')
+            plt.axhline(y=tiempo_final, color=color, linestyle='--', alpha=0.7)
+
+    plt.xlabel('Número de Retornos al Estado')
+    plt.ylabel('Tiempo Medio de Recurrencia')
+    plt.title(f'Convergencia del Tiempo de Recurrencia - {ciudad} - Todos los Estados (ε = {e})')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    
+graficar_convergencia_todos_estados(matriz_acumulada_oslo, 'Oslo', e=0.01, min_iter=5000)
+
+# ---------------------------------------------- FIN -------------------------------------------------------------- #
+
 #Juntamos los dataframes de tiempos de recurrencia en un frame e imprimimos el resultado
 tiempos_recurrencia = pd.concat([tiempos_recurrencia_oslo, tiempos_recurrencia_quito, tiempos_recurrencia_melbourne])   
 print("Tiempos de recurrencia:\n", tiempos_recurrencia)
 
 # --------------------------------- PARTE 3 ----------------------------------------------------#
-def calcular_vector_estacionario_teorico(matriz_transicion):
-    
-    matriz_entrada = matriz_transicion.values
-    A = matriz_entrada - np.eye(matriz_entrada.shape[0])  # Restamos la matriz identidad
-    A[-1, :] = 1  # Reemplazamos la última fila por unos
-    b = np.zeros(matriz_entrada.shape[0])  # Vector de 0 (excepto el último elemento)\
-    b[-1] = 1  # El último elemento del vector b es 1
-    A = np.linalg.inv(A)  
-    A = A * b.T
-    print("Matriz A:\n", A)
-
-    # Pasamos a DataFrame para seguir la misma estructura que antes
-    vector_estacionario = pd.Series(A[:, -1], index=['F', 'T', 'C'])
-    return vector_estacionario
-
-vector_estacionario_oslo = calcular_vector_estacionario_teorico(matriz_transicion_oslo)
-vector_estacionario_quito = calcular_vector_estacionario_teorico(matriz_transicion_quito)
-vector_estacionario_melbourne = calcular_vector_estacionario_teorico(matriz_transicion_melbourne)
+vector_estacionario_oslo = vector_estacionario_oslo_teorico
+vector_estacionario_quito = vector_estacionario_quito_teorico
+vector_estacionario_melbourne = vector_estacionario_melbourne_teorico
 print("\n\n\n")
 print("Vector estacionario teorico de Oslo:\n", vector_estacionario_oslo)
 print("Vector estacionario teorico de Quito:\n", vector_estacionario_quito)
 print("Vector estacionario teorico de Melbourne:\n", vector_estacionario_melbourne)
+
 # Definimos una funcion para calcular la entropia de orden 0 de cada dataset
 def calcular_entropia_orden_0(vector_estacionario):
     # La entropia de orden 0 se calcula como -sum(p * log(p)) para cada estado
@@ -443,16 +475,7 @@ def calcular_entropia_orden_0(vector_estacionario):
             entropia -= vector_estacionario.loc[i] * np.log2(vector_estacionario.loc[i])
     return entropia
 
-"""# Definimos una funcion para calcular la entropia condicional
-def calcular_entropia_condicional(matriz_conjunta):
-    # La entropia de orden 1 se calcula como -sum(p(x,y) * log(p(x,y))) para cada par de estados
-    entropia = 0
-    for i in range(3):
-        for j in range(3):
-            if matriz_conjunta[i, j] > 0:
-                entropia -= matriz_conjunta[i, j] * np.log2(matriz_conjunta[i, j])
-    return entropia"""
-    
+# Definimos una funcion para calcular la entropia condicional de cada dataset    
 def calcular_entropia_condicional(matriz_transicion, vector_estacionario):
     entropia_condicional = 0
     for entrada in matriz_transicion.columns:  # Recorremos las columnas de la matriz de transicion
@@ -676,7 +699,7 @@ def codificar_temperaturas(simbolos_sin_comprimir, codigos_huffman):
     return codificacion
 
 def codificar_temperaturas_orden_2(simbolos_sin_comprimir, codigos_huffman):
-    #Creamos una lista con los pares de simbolos no superpuestos
+    # Creamos una lista con los pares de simbolos no superpuestos
     dataset_pares = []
     for i in range(0,len(simbolos_sin_comprimir) - 1,2):
         # Nos aseguramos de que no haya un simbolo sobrante al final
@@ -700,14 +723,15 @@ codificacion_melbourne = codificar_temperaturas(melbourne_dataset['clima'].tolis
 print("\nLongitud de la codificación de Oslo:", len(codificacion_oslo), "bits")
 # Comparamos con la longitud de la codificación sin compresión, suponiendo que cada simbolo ocupa 1 byte (tamano de char)
 print("La longitud de la codificación sin compresión sería:", len(oslo_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de: %{:.3f}".format((len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100), "%")
+print("Por lo tanto, la compresión es de: {:.3f}".format((len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100), "%")
 # Repetimos para las otras 2
 print("\nLongitud de la codificación de Quito:", len(codificacion_quito), "bits")
 print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de: %{:.3f}".format((len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100), "%")
+print("Por lo tanto, la compresión es de: {:.3f}".format((len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100), "%")
+
 print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne), "bits")
 print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de: %{:.3f}".format((len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100), "%")
+print("Por lo tanto, la compresión es de: {:.3f}".format((len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100), "%")
 
 #-------------------------------- ORDEN 2 --------------------------------#
 # Codificamos las temperaturas de cada ciudad
@@ -715,28 +739,28 @@ codificacion_oslo = codificar_temperaturas_orden_2(oslo_dataset['clima'].tolist(
 codificacion_quito = codificar_temperaturas_orden_2(quito_dataset['clima'].tolist(), codigos_huffman_orden_2_quito)
 codificacion_melbourne = codificar_temperaturas_orden_2(melbourne_dataset['clima'].tolist(), codigos_huffman_orden_2_melbourne)
 
-#Oslo
+# Oslo
 # Imprimimos las longitudes de cada codificaciones y las comparamos con el espacio que ocupara sin compresion
 print("\nLongitud de la codificación de Oslo:", len(codificacion_oslo), "bits")
 # Comparamos con la longitud de la codificación sin compresión
 print("La longitud de la codificación sin compresión sería:", len(oslo_dataset) * 8, "bits")  # 1B por simbolo, pq no estan juntos en el dataset
-print("Por lo tanto, la compresión es de: %{:.3f}".format((len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100), "%")
+print("Por lo tanto, la compresión es de: {:.3f}".format((len(oslo_dataset) * 8 - len(codificacion_oslo)) / (len(oslo_dataset) * 8) * 100), "%")
 
 #Repetimos para las otras 2
 
 #Quito
 print("\nLongitud de la codificación de Quito:", len(codificacion_quito), "bits")
 print("La longitud de la codificación sin compresión sería:", len(quito_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de: %{:.3f}".format((len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100), "%")
+print("Por lo tanto, la compresión es de: {:.3f}".format((len(quito_dataset) * 8 - len(codificacion_quito)) / (len(quito_dataset) * 8) * 100), "%")
 
 #Melbourne
 print("\nLongitud de la codificación de Melbourne:", len(codificacion_melbourne), "bits")
 print("La longitud de la codificación sin compresión sería:", len(melbourne_dataset) * 8, "bits")
-print("Por lo tanto, la compresión es de: %{:.3f}".format((len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100), "%")
+print("Por lo tanto, la compresión es de: {:.3f}".format((len(melbourne_dataset) * 8 - len(codificacion_melbourne)) / (len(melbourne_dataset) * 8) * 100), "%")
 
 #---------------------------------------------------- Parte 4 ------------------------------------------------------------------------------#
 
-#Adjuntamos el clima de entrada en la tabla, para manejarlo mas facil
+# Adjuntamos el clima de entrada en la tabla, para manejarlo mas facil
 melbourne_ruidoso_dataset['clima_entrada'] = melbourne_dataset['clima']
 
 # Generamos los simbolos de las temperaturas de cada ciudad (F, T, C)
@@ -746,7 +770,7 @@ print("\nDatos de entrada y salida de Melbourne ruidoso:\n", melbourne_ruidoso_d
 # Calculamos la matriz de transicion del canal T4
 matriz_transicion_t4 = calcular_matriz_transicion(melbourne_ruidoso_dataset['clima_entrada'], melbourne_ruidoso_dataset['clima_salida'])
 print("\nMatriz de transición del canal T4:\n", matriz_transicion_t4)
-#Calculamos el ruido del canal
+# Calculamos el ruido del canal
 def calcular_ruido_canal(matriz_transicion,vector_estacionario): # El estacionario es F T C
     rx = {'F':0, 'T':0, 'C':0}  # Inicializamos el vector de ruido para cada estado
     for entrada in matriz_transicion.columns:  
@@ -766,7 +790,7 @@ def calcular_informacion_mutua(matriz_transicion, vector_estacionario):
     for entrada in matriz_transicion.columns:
         for salida in matriz_transicion.index:
             dist_y[salida[0]] += matriz_transicion.loc[salida, entrada] * vector_estacionario[entrada[0]]
-    #Despues calculamos la informacion mutua con el dato obtenido
+    # Despues calculamos la informacion mutua con el dato obtenido
     Hy = 0
     for estado in ['F', 'T', 'C']:
         if dist_y[estado] > 0:
