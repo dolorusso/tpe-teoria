@@ -1,5 +1,4 @@
-# Importamos la librería pandas y seaborn
-#import seaborn as sns
+# Importamos las librerias necesarias
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -85,47 +84,7 @@ media_desvio_ciudades['Desvio_Estandar'] = [
 media_desvio_df = pd.DataFrame(media_desvio_ciudades)
 # Establecemos la columna 'Ciudad' como índice de la tabla, para no la fila con indices numericos
 media_desvio_df.set_index('Ciudad', inplace=True)
-
-# Ejecutar la función
-from graficas import mostrar_tabla_matplotlib
-'mostrar_tabla_matplotlib(media_desvio_df)'
-
-
-
-# Para complementar estos datos, los analizaremos junto a la distribución de las temperaturas de cada ciudad.
-# Realizamos el histograma de las temperaturas de cada ciudad para observar la distribución de los datos.
-
-def crear_histograma(dataset, ciudad,rangox):
-    plt.figure(figsize=(15, 5))
-    valores_unicos = sorted(dataset['AvgTemperature'].unique())
-    bins = [v - 0.5 for v in range(int(min(valores_unicos)), int(max(valores_unicos)) + 2)]
-    plt.hist(dataset['AvgTemperature'], bins=bins, alpha=0.7, label=ciudad, edgecolor='black')
-    plt.title(f'Distribución de Temperaturas en {ciudad}')
-    plt.xlabel('Temperatura (°C)')
-    plt.ylabel('Frecuencia')
-    #Agregamos la media y el desvío estándar al gráfico
-    media = media_desvio_df.loc[ciudad]['Media']
-    desvio_estandar = media_desvio_df.loc[ciudad]['Desvio_Estandar']
-    plt.axvline(media, color='red', linestyle='dashed', linewidth=1, label=f'Media: {media:.2f}°C')
-    plt.axvline(media + desvio_estandar, color='green', linestyle='dashed', linewidth=1, label=f'+1 Desvío Estándar: {media + desvio_estandar:.2f}°C')
-    plt.axvline(media - desvio_estandar, color='green', linestyle='dashed', linewidth=1, label=f'-1 Desvío Estándar: {media - desvio_estandar:.2f}°C')
-    plt.xticks(rangox)  
-    
-    plt.legend()
-    plt.show()
-
-# Configuración de los gráficos 
-
-
-# Creamos los histogramas para cada ciudad
-
-
-crear_histograma(oslo_dataset, 'Oslo',range(-25,25,5))
-crear_histograma(quito_dataset, 'Quito',range(10,20,1))
-crear_histograma(melbourne_dataset, 'Melbourne',range(5,30,5))
-
-
-
+print("Media y Desvío Estándar de las Ciudades:\n", media_desvio_df)
 
 #Quito tiene la temperatura media más estable (desvío estándar más bajo: ~1.3 °C), lo cual es típico de una ciudad ecuatorial con clima templado todo el año.
 #Oslo muestra la mayor variabilidad térmica (desvío estándar de ~8.79 °C) por lo que tiene un clima más cambiante.
