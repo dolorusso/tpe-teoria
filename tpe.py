@@ -193,7 +193,7 @@ print("Matriz acumulada de Oslo:\n", matriz_acumulada_oslo)
 print("Matriz acumulada de Quito:\n", matriz_acumulada_quito)
 print("Matriz acumulada de Melbourne:\n", matriz_acumulada_melbourne)
 
-#Definimos las funciones auxilineares necesarias
+# Definimos las funciones auxiliares necesarias
 def converge_vector(vector1, vector2, e=0.00001):
     # Compara dos vectores y verifica si la diferencia es menor que el umbral epsilon
     for i in range(len(vector1)):
@@ -231,12 +231,11 @@ def calcular_vector_estacionario(matriz_acumulada, e=0.000001, min_iter=5000):
         Vt_anterior = Vt_actual.copy()
         Vt_actual = emisiones / cantidad_simbolos
     
-    if cantidad_simbolos % 100 == 0:
-        historial_vectores.append((cantidad_simbolos, Vt_actual.copy()))
+        if cantidad_simbolos % 100 == 0:
+            historial_vectores.append((cantidad_simbolos, Vt_actual.copy()))
     return Vt_actual, historial_vectores
 
 def calcular_vector_estacionario_teorico(matriz_transicion):
-    
     matriz_entrada = matriz_transicion.values
     A = matriz_entrada - np.eye(matriz_entrada.shape[0])  # Restamos la matriz identidad
     A[-1, :] = 1  # Reemplazamos la última fila por unos
@@ -244,7 +243,6 @@ def calcular_vector_estacionario_teorico(matriz_transicion):
     b[-1] = 1  # El último elemento del vector b es 1
     A = np.linalg.inv(A)  
     A = A * b.T
-    print("Matriz A:\n", A)
 
     # Pasamos a DataFrame para seguir la misma estructura que antes
     vector_estacionario = pd.Series(A[:, -1], index=['F', 'T', 'C'])
@@ -258,14 +256,9 @@ vector_estacionario_oslo_teorico = calcular_vector_estacionario_teorico(matriz_t
 vector_estacionario_quito_teorico = calcular_vector_estacionario_teorico(matriz_transicion_quito)
 vector_estacionario_melbourne_teorico = calcular_vector_estacionario_teorico(matriz_transicion_melbourne)
 
-# Modificación de tu función original para que también devuelva el historial
-
-
-# Función para graficar usando tu función original
 def graficar_convergencia_epsilon(matriz_acumulada, estacionario_teorico, e=0.000001, min_iter=10000):
-    # Llamar a tu función modificada
     vector_final, historial = calcular_vector_estacionario(matriz_acumulada, e, min_iter)
-    
+    print(f"HISTORIA: {historial}  \n")
     # Extraer los datos del historial
     iteraciones = [punto[0] for punto in historial]
     coord_0 = [punto[1][0] for punto in historial]
@@ -277,9 +270,9 @@ def graficar_convergencia_epsilon(matriz_acumulada, estacionario_teorico, e=0.00
     plt.plot(iteraciones, coord_0, 'r-', label='Coordenada 0 (F)', linewidth=2)
     plt.plot(iteraciones, coord_1, 'g-', label='Coordenada 1 (T)', linewidth=2)
     plt.plot(iteraciones, coord_2, 'b-', label='Coordenada 2 (C)', linewidth=2)
-    plt.axhline(y=estacionario_teorico[0], color='r', linestyle='--', label='Vector Estacionario Teórico F')
-    plt.axhline(y=estacionario_teorico[1], color='g', linestyle='--', label='Vector Estacionario Teórico T')
-    plt.axhline(y=estacionario_teorico[2], color='b', linestyle='--', label='Vector Estacionario Teórico C')
+    plt.axhline(y=estacionario_teorico.loc['F'], color='r', linestyle='--', label='Vector Estacionario Teórico F')
+    plt.axhline(y=estacionario_teorico.loc['T'], color='g', linestyle='--', label='Vector Estacionario Teórico T')
+    plt.axhline(y=estacionario_teorico.loc['C'], color='b', linestyle='--', label='Vector Estacionario Teórico C')
 
     plt.xlabel('Número de Iteraciones')
     plt.ylabel('Valor de la Coordenada')
@@ -288,7 +281,7 @@ def graficar_convergencia_epsilon(matriz_acumulada, estacionario_teorico, e=0.00
     plt.grid(True, alpha=0.3)
     plt.show()
     
-    return vector_final    
+    return vector_final
 
 # Comparar diferentes epsilons
 graficar_convergencia_epsilon(matriz_acumulada_oslo, vector_estacionario_oslo_teorico, e=0.00001, min_iter=5000)
