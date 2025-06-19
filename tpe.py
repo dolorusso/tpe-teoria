@@ -269,6 +269,92 @@ def calcular_vector_estacionario(matriz_acumulada, e=0.000001, min_iter=5000):
     
     return Vt_actual
 
+# --------------------------------------- GRAFICA DE CONVERGENCIA ------------------------------------ #
+# Modificación de tu función original para que también devuelva el historial
+def calcular_vector_estacionario_con_historial(matriz_acumulada, e=0.000001, min_iter=5000):
+    # Listas para almacenar la evolución
+    historial_vectores = []
+    
+    # Inicializar el vector estacionario
+    emisiones = np.array([0, 0, 0])  # Contador de emisiones para cada estado
+    Vt_actual = np.array([0, 0, 0])  # Vector de emisiones actual
+    Vt_anterior = np.array([0, 0, 0])  # Vector de emisiones anterior
+    cantidad_simbolos = 0  # Contador de símbolos generados
+    simbolo_actual = 0  # Estado actual
+    
+    while not converge_vector(Vt_actual, Vt_anterior, e) or cantidad_simbolos < min_iter:
+        # Generamos el proximo simbolo
+        simbolo_actual = generar_proximo_estado(matriz_acumulada, simbolo_actual)
+        emisiones[simbolo_actual] += 1
+        cantidad_simbolos += 1
+        # Actualizamos el vector de emisiones
+        Vt_anterior = Vt_actual.copy()
+        Vt_actual = emisiones / cantidad_simbolos
+        
+        # Guardamos el historial cada cierto número de iteraciones
+        if cantidad_simbolos % 100 == 0:
+            historial_vectores.append((cantidad_simbolos, Vt_actual.copy()))
+    
+    return Vt_actual, historial_vectores
+
+# Función para graficar usando tu función original
+def graficar_convergencia_epsilon(matriz_acumulada, e=0.000001, min_iter=5000):
+    # Llamar a tu función modificada
+    vector_final, historial = calcular_vector_estacionario_con_historial(matriz_acumulada, e, min_iter)
+    
+    # Extraer los datos del historial
+    iteraciones = [punto[0] for punto in historial]
+    coord_0 = [punto[1][0] for punto in historial]
+    coord_1 = [punto[1][1] for punto in historial]
+    coord_2 = [punto[1][2] for punto in historial]
+    
+    # Crear el gráfico
+    plt.figure(figsize=(12, 8))
+    plt.plot(iteraciones, coord_0, 'r-', label='Coordenada 0 (F)', linewidth=2)
+    plt.plot(iteraciones, coord_1, 'g-', label='Coordenada 1 (T)', linewidth=2)
+    plt.plot(iteraciones, coord_2, 'b-', label='Coordenada 2 (C)', linewidth=2)
+    
+    plt.xlabel('Número de Iteraciones')
+    plt.ylabel('Valor de la Coordenada')
+    plt.title(f'Convergencia del Vector Estacionario (ε = {e})')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    
+    return vector_final
+
+# Función para comparar diferentes epsilons usando tu función original
+def comparar_epsilons(matriz_acumulada, epsilons=[0.01, 0.001, 0.0001], min_iter=5000):
+    plt.figure(figsize=(12, 8))
+    
+    for e in epsilons:
+        # Llamar a tu función para cada epsilon
+        vector_final, historial = calcular_vector_estacionario_con_historial(matriz_acumulada, e, min_iter)
+        
+        # Extraer datos
+        iteraciones = [punto[0] for punto in historial]
+        coord_0 = [punto[1][0] for punto in historial]
+        coord_1 = [punto[1][1] for punto in historial]
+        coord_2 = [punto[1][2] for punto in historial]
+        
+        # Graficar solo una coordenada por epsilon para claridad
+        plt.plot(iteraciones, coord_0, label=f'Coord 0, ε={e}', linewidth=2)
+        plt.plot(iteraciones, coord_1, label=f'Coord 1, ε={e}', linewidth=2, linestyle='--')
+        plt.plot(iteraciones, coord_2, label=f'Coord 2, ε={e}', linewidth=2, linestyle=':')
+    
+    plt.xlabel('Número de Iteraciones')
+    plt.ylabel('Valor de la Coordenada')
+    plt.title('Comparación de Convergencia para Diferentes Valores de ε')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.show()
+    
+
+# Comparar diferentes epsilons
+comparar_epsilons(matriz_acumulada_oslo, [0.01, 0.0001,0.000001])
+
+# --------------------------------------- FIN ---------------------------------------------- #
+
 # Calculamos el vector estacionario para cada dataset
 vector_estacionario_oslo = calcular_vector_estacionario(matriz_acumulada_oslo)
 vector_estacionario_quito = calcular_vector_estacionario(matriz_acumulada_quito)
@@ -531,22 +617,51 @@ def calcular_longitud_media(df_probabilidades, df_codigos):
     return longitud_promedio
 
 #Comparamos los limites de longitud de los codigos de Huffman con la longitud media por simbolo de los codigos
+
+#----------------------------------------- Orden 1 -----------------------------------------#
+# Para orden 1: convertir el vector estacionario a DataFrame
+def calcular_longitud_media_orden_1(vector_estacionario, df_codigos):
+    # Convertir la Serie a DataFrame con el nombre de columna correcto
+    df_probabilidades = vector_estacionario.to_frame(name='Probabilidad')
+    # Usar tu función original
+    return calcular_longitud_media(df_probabilidades, df_codigos)
+# Oslo
+print("Limite inferior y superior de la longitud de los codigos de Huffman para Oslo orden 1:")
+limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H0_oslo, Hcond_oslo, 1)
+print(f"Limite inferior: {limite_inferior_oslo:.3f}, Limite superior: {limite_superior_oslo:.3f}")
+longitud_media_oslo = calcular_longitud_media_orden_1(vector_estacionario_oslo, codigos_huffman_oslo)
+print(f"Longitud media por simbolo de los codigos de Huffman para Oslo: {longitud_media_oslo:.3f}")
+
+# Quito
+print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Quito orden 1:")
+limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H0_quito, Hcond_quito, 1)
+print(f"Limite inferior: {limite_inferior_quito:.3f}, Limite superior: {limite_superior_quito:.3f}")
+longitud_media_quito = calcular_longitud_media_orden_1(vector_estacionario_quito, codigos_huffman_quito)
+print(f"Longitud media por simbolo de los codigos de Huffman para Quito: {longitud_media_quito:.3f}")
+
+# Melbourne
+print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Melbourne orden 1:")
+limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H0_melbourne, Hcond_melbourne, 1)
+print(f"Limite inferior: {limite_inferior_melbourne:.3f}, Limite superior: {limite_superior_melbourne:.3f}")
+longitud_media_melbourne = calcular_longitud_media_orden_1(vector_estacionario_melbourne, codigos_huffman_melbourne)
+print(f"Longitud media por simbolo de los codigos de Huffman para Melbourne: {longitud_media_melbourne:.3f}")
+#----------------------------------------- Orden 2 -----------------------------------------#
 #Oslo
-print("limite inferior y superior de la longitud de los codigos de Huffman para Oslo:")
+print("limite inferior y superior de la longitud de los codigos de Huffman para Oslo orden 2:")
 limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H0_oslo, Hcond_oslo, 2)
 print(f"Limite inferior: {limite_inferior_oslo:.3f}, Limite superior: {limite_superior_oslo:.3f}")
 longitud_media_oslo = calcular_longitud_media(codigos_huffman_orden_2_oslo, fuente_orden_2_oslo)
 print(f"Longitud media por simbolo de los codigos de Huffman para Oslo: {longitud_media_oslo/2:.3f}")
 
 #Quito
-print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Quito:")
+print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Quito orden 2:")
 limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H0_quito, Hcond_quito, 2)
 print(f"Limite inferior: {limite_inferior_quito:.3f}, Limite superior: {limite_superior_quito:.3f}")
 longitud_media_quito = calcular_longitud_media(codigos_huffman_orden_2_quito, fuente_orden_2_quito)
 print(f"Longitud media por simbolo de los codigos de Huffman para Quito: {longitud_media_quito/2:.3f}")
 
 #Melbourne
-print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Melbourne:")
+print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Melbourne orden 2:")
 limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H0_melbourne, Hcond_melbourne, 2)
 print(f"Limite inferior: {limite_inferior_melbourne:.3f}, Limite superior: {limite_superior_melbourne:.3f}")
 longitud_media_melbourne = calcular_longitud_media(codigos_huffman_orden_2_melbourne, fuente_orden_2_melbourne)
