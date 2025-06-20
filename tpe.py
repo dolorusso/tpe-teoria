@@ -86,10 +86,6 @@ media_desvio_df = pd.DataFrame(media_desvio_ciudades)
 media_desvio_df.set_index('Ciudad', inplace=True)
 print("Media y Desvío Estándar de las Ciudades:\n", media_desvio_df)
 
-#Quito tiene la temperatura media más estable (desvío estándar más bajo: ~1.3 °C), lo cual es típico de una ciudad ecuatorial con clima templado todo el año.
-#Oslo muestra la mayor variabilidad térmica (desvío estándar de ~8.79 °C) por lo que tiene un clima más cambiante.
-#Melbourne tiene la media más alta (~17.8 °C), pero también muestra una variabilidad moderada (desvío estándar de ~4.25 °C), lo que sugiere un clima templado oceánico con cambios frecuentes.
-
 #Funcion que calcula el factor de correlacion cruzado entre dos datasets 
 def calcular_correlacion_cruzada(dataset1, dataset2,nombre_ciudad1, nombre_ciudad2):
     if len(dataset1) != len(dataset2):
@@ -258,7 +254,6 @@ vector_estacionario_melbourne_teorico = calcular_vector_estacionario_teorico(mat
 
 def graficar_convergencia_epsilon(matriz_acumulada, estacionario_teorico, e=0.000001, min_iter=10000):
     vector_final, historial = calcular_vector_estacionario(matriz_acumulada, e, min_iter)
-    print(f"HISTORIA: {historial}  \n")
     # Extraer los datos del historial
     iteraciones = [punto[0] for punto in historial]
     coord_0 = [punto[1][0] for punto in historial]
@@ -349,6 +344,10 @@ tiempos_recurrencia_oslo = calcular_tiempos_recurrencia(matriz_acumulada_oslo, '
 tiempos_recurrencia_quito = calcular_tiempos_recurrencia(matriz_acumulada_quito, 'Quito')
 tiempos_recurrencia_melbourne = calcular_tiempos_recurrencia(matriz_acumulada_melbourne, 'Melbourne')
 
+#Juntamos los dataframes de tiempos de recurrencia en un frame e imprimimos el resultado
+tiempos_recurrencia = pd.concat([tiempos_recurrencia_oslo, tiempos_recurrencia_quito, tiempos_recurrencia_melbourne])   
+print("Tiempos de recurrencia:\n", tiempos_recurrencia)
+
 # -------------------------------- GRAFICAR CONVERGENCIA DE TIEMPOS DE RECURRENCIA -------------------------------- #
 # Función para graficar la convergencia de un estado específico
 def graficar_convergencia_recurrencia(matriz_acumulada, estado_inicial, ciudad, estado_nombre, e=0.0001, min_iter=5000):
@@ -405,9 +404,7 @@ graficar_convergencia_todos_estados(matriz_acumulada_oslo, 'Oslo', e=0.01, min_i
 
 # ---------------------------------------------- FIN -------------------------------------------------------------- #
 
-#Juntamos los dataframes de tiempos de recurrencia en un frame e imprimimos el resultado
-tiempos_recurrencia = pd.concat([tiempos_recurrencia_oslo, tiempos_recurrencia_quito, tiempos_recurrencia_melbourne])   
-print("Tiempos de recurrencia:\n", tiempos_recurrencia)
+
 
 # --------------------------------- PARTE 3 ----------------------------------------------------#
 vector_estacionario_oslo = vector_estacionario_oslo_teorico
@@ -598,7 +595,6 @@ def calcular_longitud_media(df_probabilidades, df_codigos):
 def calcular_longitud_media_orden_1(vector_estacionario, df_codigos):
     # Convertir la Serie a DataFrame con el nombre de columna correcto
     df_probabilidades = vector_estacionario.to_frame(name='Probabilidad')
-    # Usar tu función original
     return calcular_longitud_media(df_probabilidades, df_codigos)
 # Oslo
 print("Limite inferior y superior de la longitud de los codigos de Huffman para Oslo orden 1:")
@@ -751,5 +747,3 @@ def calcular_informacion_mutua(matriz_transicion, vector_estacionario):
 
 informacion_mutua_canal = calcular_informacion_mutua(matriz_transicion_t4, vector_estacionario_melbourne)
 print("Información mutua del canal T4:", informacion_mutua_canal)
-
-
