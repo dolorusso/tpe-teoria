@@ -415,9 +415,9 @@ print("Vector estacionario teorico de Oslo:\n", vector_estacionario_oslo)
 print("Vector estacionario teorico de Quito:\n", vector_estacionario_quito)
 print("Vector estacionario teorico de Melbourne:\n", vector_estacionario_melbourne)
 
-# Definimos una funcion para calcular la entropia de orden 0 de cada dataset
-def calcular_entropia_orden_0(vector_estacionario):
-    # La entropia de orden 0 se calcula como -sum(p * log(p)) para cada estado
+# Definimos una funcion para calcular la entropia H1 de cada dataset
+def calcular_entropia_H1(vector_estacionario):
+    # La entropia H1 se calcula como -sum(p * log(p)) para cada estado
     entropia = 0
     for i in vector_estacionario.index:  # Recorremos los indices del vector estacionario):
         if vector_estacionario.loc[i] > 0:  # Evitar log(0) pq da error
@@ -435,17 +435,17 @@ def calcular_entropia_condicional(matriz_transicion, vector_estacionario):
         entropia_condicional += vector_estacionario[entrada[0]] * h_i
     return entropia_condicional
 
-# Calculamos la entropia de orden 0 y 1 para cada dataset
-H0_oslo = calcular_entropia_orden_0(vector_estacionario_oslo)
-H0_quito = calcular_entropia_orden_0(vector_estacionario_quito)
-H0_melbourne = calcular_entropia_orden_0(vector_estacionario_melbourne)
+# Calculamos la entropias para cada dataset
+H1_oslo = calcular_entropia_H1(vector_estacionario_oslo)
+H1_quito = calcular_entropia_H1(vector_estacionario_quito)
+H1_melbourne = calcular_entropia_H1(vector_estacionario_melbourne)
 
 Hcond_oslo = calcular_entropia_condicional(matriz_transicion_oslo, vector_estacionario_oslo)
 Hcond_quito = calcular_entropia_condicional(matriz_transicion_quito, vector_estacionario_quito)
 Hcond_melbourne = calcular_entropia_condicional(matriz_transicion_melbourne, vector_estacionario_melbourne)
-# Imprimimos las entropias de orden 0 y 1 en un dataframe conjunto
+# Imprimimos las entropias en un dataframe conjunto
 entropias = pd.DataFrame({
-    'H0': [H0_oslo, H0_quito, H0_melbourne],
+    'H1': [H1_oslo, H1_quito, H1_melbourne],
     'Hcond': [Hcond_oslo, Hcond_quito, Hcond_melbourne]
 }, index=['Oslo', 'Quito', 'Melbourne'])
 print("Entropías H1 y Hcond:\n", entropias)
@@ -598,42 +598,42 @@ def calcular_longitud_media_orden_1(vector_estacionario, df_codigos):
     return calcular_longitud_media(df_probabilidades, df_codigos)
 # Oslo
 print("Limite inferior y superior de la longitud de los codigos de Huffman para Oslo orden 1:")
-limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H0_oslo, Hcond_oslo, 1)
+limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H1_oslo, Hcond_oslo, 1)
 print(f"Limite inferior: {limite_inferior_oslo:.3f}, Limite superior: {limite_superior_oslo:.3f}")
 longitud_media_oslo = calcular_longitud_media_orden_1(vector_estacionario_oslo, codigos_huffman_oslo)
 print(f"Longitud media por simbolo de los codigos de Huffman para Oslo: {longitud_media_oslo:.3f}")
 
 # Quito
 print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Quito orden 1:")
-limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H0_quito, Hcond_quito, 1)
+limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H1_quito, Hcond_quito, 1)
 print(f"Limite inferior: {limite_inferior_quito:.3f}, Limite superior: {limite_superior_quito:.3f}")
 longitud_media_quito = calcular_longitud_media_orden_1(vector_estacionario_quito, codigos_huffman_quito)
 print(f"Longitud media por simbolo de los codigos de Huffman para Quito: {longitud_media_quito:.3f}")
 
 # Melbourne
 print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Melbourne orden 1:")
-limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H0_melbourne, Hcond_melbourne, 1)
+limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H1_melbourne, Hcond_melbourne, 1)
 print(f"Limite inferior: {limite_inferior_melbourne:.3f}, Limite superior: {limite_superior_melbourne:.3f}")
 longitud_media_melbourne = calcular_longitud_media_orden_1(vector_estacionario_melbourne, codigos_huffman_melbourne)
 print(f"Longitud media por simbolo de los codigos de Huffman para Melbourne: {longitud_media_melbourne:.3f}")
 #----------------------------------------- Orden 2 -----------------------------------------#
 #Oslo
 print("limite inferior y superior de la longitud de los codigos de Huffman para Oslo orden 2:")
-limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H0_oslo, Hcond_oslo, 2)
+limite_inferior_oslo, limite_superior_oslo = calcular_limite_huffman(H1_oslo, Hcond_oslo, 2)
 print(f"Limite inferior: {limite_inferior_oslo:.3f}, Limite superior: {limite_superior_oslo:.3f}")
 longitud_media_oslo = calcular_longitud_media(codigos_huffman_orden_2_oslo, fuente_orden_2_oslo)
 print(f"Longitud media por simbolo de los codigos de Huffman para Oslo: {longitud_media_oslo/2:.3f}")
 
 #Quito
 print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Quito orden 2:")
-limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H0_quito, Hcond_quito, 2)
+limite_inferior_quito, limite_superior_quito = calcular_limite_huffman(H1_quito, Hcond_quito, 2)
 print(f"Limite inferior: {limite_inferior_quito:.3f}, Limite superior: {limite_superior_quito:.3f}")
 longitud_media_quito = calcular_longitud_media(codigos_huffman_orden_2_quito, fuente_orden_2_quito)
 print(f"Longitud media por simbolo de los codigos de Huffman para Quito: {longitud_media_quito/2:.3f}")
 
 #Melbourne
 print("\nLimite inferior y superior de la longitud de los codigos de Huffman para Melbourne orden 2:")
-limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H0_melbourne, Hcond_melbourne, 2)
+limite_inferior_melbourne, limite_superior_melbourne = calcular_limite_huffman(H1_melbourne, Hcond_melbourne, 2)
 print(f"Limite inferior: {limite_inferior_melbourne:.3f}, Limite superior: {limite_superior_melbourne:.3f}")
 longitud_media_melbourne = calcular_longitud_media(codigos_huffman_orden_2_melbourne, fuente_orden_2_melbourne)
 print(f"Longitud media por simbolo de los codigos de Huffman para Melbourne: {longitud_media_melbourne/2:.3f}")
